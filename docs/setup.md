@@ -164,6 +164,8 @@ touches the game.
 The probe prints a summary every minute. The numbers that matter are the combat log's
 "newest event … s old" values, which show how far behind the file is, and how many lines
 carry a position. `--show-lines` prints every line instead of the first of each type.
+Everything is also saved to `wowtracker-probe.log` in the folder you start it from
+(`--log <file>` picks another file).
 Type `/combatlog` again to stop logging; the log files can get large. Leave combat
 logging on or off as it is during fights; switching it to force a write would be working
 around Blizzard's deliberate delay.

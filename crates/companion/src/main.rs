@@ -68,7 +68,11 @@ fn run(args: Args) -> Result<(), String> {
     log(&format!("game folder: {}", game_dir.display()));
 
     if args.probe {
-        return wowtracker_companion::probe::run(&game_dir, args.show_lines);
+        let log_file = args
+            .log
+            .clone()
+            .unwrap_or_else(|| std::path::PathBuf::from(wowtracker_companion::probe::DEFAULT_LOG_FILE));
+        return wowtracker_companion::probe::run(&game_dir, args.show_lines, &log_file);
     }
 
     let mut companion = Companion::new(cfg, args, game_dir);

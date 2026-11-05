@@ -6,3 +6,6 @@ wowtracker-companion.toml
 frontend/maps/*
 !frontend/maps/README.md
 demo/
+
+# Probe output
+wowtracker-probe*.log

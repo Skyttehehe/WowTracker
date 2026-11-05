@@ -142,11 +142,23 @@ struct Tracked {
 }
 
 /// Runs until Ctrl+C.
-pub fn run(game_dir: &Path, show_lines: bool) -> Result<(), String> {
+pub fn run(game_dir: &Path, show_lines: bool, log_file: &Path) -> Result<(), String> {
     let roots: Vec<PathBuf> = ["Logs", "WTF", "Screenshots", "Errors"]
         .iter()
         .map(|n| game_dir.join(n))
         .collect();
+
+    match open_log(log_file) {
+        Ok(()) => {
+            let shown = if log_file.is_absolute() {
+                log_file.to_path_buf()
+            } else {
+                std::env::current_dir().map(|d| d.join(log_file)).unwrap_or_else(|_| log_file.to_path_buf())
+            };
+            say(&format!("---- probe started; also writing to {} ----", shown.display()));
+        }
+        Err(e) => say(&format!("probe: cannot write {} ({e}); output goes to the screen only", log_file.display())),
+    }
 
     say(&format!("probe: watching {} (Logs, WTF, Screenshots, Errors)", game_dir.display()));
     say("probe: this only reads files; it never touches the game. Ctrl+C to stop.");
@@ -215,9 +227,13 @@ pub fn run(game_dir: &Path, show_lines: bool) -> Result<(), String> {
             }
         }
 
+        // Summarise only the last minute, and only if something was written.
         if last_summary.elapsed() >= Duration::from_secs(60) {
             last_summary = Instant::now();
-            summary(&stats, &write_counts);
+            if !write_counts.is_empty() {
+                summary(&stats, &write_counts);
+                write_counts.clear();
+            }
         }
     }
 }
@@ -280,18 +296,16 @@ fn report_combat_batch(
 }
 
 fn summary(stats: &CombatStats, writes: &BTreeMap<String, u32>) {
-    say("---- last minutes summary ----");
-    if writes.is_empty() {
-        say("no files written yet");
-    }
-    for (group, n) in writes {
-        say(&format!("  {group}: {n} write(s)"));
-    }
+    let list: Vec<String> = writes
+        .iter()
+        .map(|(group, n)| if *n > 1 { format!("{group} ×{n}") } else { group.clone() })
+        .collect();
+    say(&format!("last minute, files written: {}", list.join(", ")));
     if stats.flushes > 0 {
         let avg = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
         let max = |v: &[f64]| v.iter().cloned().fold(f64::MIN, f64::max);
         say(&format!(
-            "  combat log: {} flushes, {} lines, {} with position; newest-line age avg {:.1}s max {:.1}s; oldest-line age avg {:.1}s max {:.1}s",
+            "combat log so far: {} flushes, {} lines, {} with position; newest-line age avg {:.1}s max {:.1}s; oldest-line age avg {:.1}s max {:.1}s",
             stats.flushes,
             stats.lines,
             stats.positions,
@@ -301,7 +315,6 @@ fn summary(stats: &CombatStats, writes: &BTreeMap<String, u32>) {
             max(&stats.oldest_ages),
         ));
     }
-    say("------------------------------");
 }
 
 fn walk(roots: &[PathBuf]) -> Vec<PathBuf> {
@@ -372,8 +385,24 @@ fn truncate(s: &str, max: usize) -> String {
     }
 }
 
+/// Copy of everything the probe prints, so nothing is lost to terminal scrollback.
+static LOG_FILE: std::sync::OnceLock<std::sync::Mutex<File>> = std::sync::OnceLock::new();
+
+pub const DEFAULT_LOG_FILE: &str = "wowtracker-probe.log";
+
+fn open_log(path: &Path) -> std::io::Result<()> {
+    let f = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
+    let _ = LOG_FILE.set(std::sync::Mutex::new(f));
+    Ok(())
+}
+
 fn say(msg: &str) {
-    println!("[{}] {msg}", Local::now().format("%H:%M:%S"));
+    let line = format!("[{}] {msg}", Local::now().format("%H:%M:%S"));
+    println!("{line}");
+    if let Some(Ok(mut f)) = LOG_FILE.get().map(|m| m.lock()) {
+        use std::io::Write;
+        let _ = writeln!(f, "{line}");
+    }
 }
 
 #[cfg(test)]

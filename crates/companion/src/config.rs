@@ -112,6 +112,7 @@ pub struct Args {
     pub init: bool,
     pub probe: bool,
     pub show_lines: bool,
+    pub log: Option<PathBuf>,
     pub help: bool,
     pub version: bool,
 }
@@ -123,7 +124,8 @@ USAGE:
     wowtracker-companion [OPTIONS]
     wowtracker-companion init        write an example config file
     wowtracker-companion probe       show which game files are written while you play, and
-                                     how far behind the combat log is (--show-lines: every line)
+                                     how far behind the combat log is (--show-lines: every line;
+                                     --log <file>: copy of the output, default wowtracker-probe.log)
 
 OPTIONS:
     --config <file>      config file (default: wowtracker-companion.toml here or next to the program)
@@ -148,6 +150,7 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Args, String
             "init" => out.init = true,
             "probe" => out.probe = true,
             "--show-lines" => out.show_lines = true,
+            "--log" => out.log = Some(PathBuf::from(value("--log")?)),
             "--config" => out.config = Some(PathBuf::from(value("--config")?)),
             "--wow-path" => out.wow_path = Some(PathBuf::from(value("--wow-path")?)),
             "--endpoint" => out.endpoint = Some(value("--endpoint")?),

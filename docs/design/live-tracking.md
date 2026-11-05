@@ -1,6 +1,6 @@
 # Design research: how live can the tracker be?
 
-Status: research done, in-game measurements pending (2026-11-05)
+Status: research done; first in-game measurements in (2026-11-05), quiet-area test pending
 
 ## Problem
 
@@ -40,7 +40,7 @@ one and a few minutes.
 |---|---|---|---|---|---|
 | 0 | SavedVariables + file watcher (**current**) | At `/reload`, `/wt sync`, logout | Everything the addon collects | None | Built |
 | 1 | Battle.net API, protected character | Unknown: logout only, or periodic while online | Position (world x/y, zone, map), level | None (official API, your consent) | Needs testing |
-| 2 | Combat log tail (advanced logging on) | Minutes (one beta report: ~4 min after a fight) | Your position on every spell you cast, zone changes, enemy names, HP, levels | Very low (how Warcraft Logs works) | Probe built |
+| 2 | Combat log tail (advanced logging on) | **Measured: 40–65 s in a busy zone** (written in ~32 KB batches); slower when quiet | Your position whenever you fight, zone changes with map bounds, enemy names, HP | Very low (how Warcraft Logs works) | Measured; best candidate |
 | 3 | Developer log (`C_Log.LogMessage`) | Unknown | Whatever the addon writes | None if it works | Needs testing |
 | 4 | Chat log | Written at exit | — | Low | Rejected |
 | 5 | Config.wtf / other WTF files | Written at logout or reload | — | None | Rejected |
@@ -83,6 +83,62 @@ one and a few minutes.
 - **Why it matters.** If that file is written promptly, the addon could write its own
   status line every few seconds. That would be the best risk-free channel.
 - **Status.** Completely untested.
+
+## Measurements (2026-11-05)
+
+Taken with `wowtracker-companion probe` on the Forever client (build 1.60.1), a warrior
+in Teldrassil at launch, with many other players nearby.
+
+### Files written during play
+
+Over 43 minutes of play before combat logging was turned on, the only files written
+without a reload were `Logs/Hotfix.log` (server hotfix data, about every 7 minutes),
+`Logs/gx.log` (graphics, window focus) and `Logs/QuestCache.log` (quest completion
+checks, 10–40 s late). None contains character data. SavedVariables and the WTF caches
+were written only at login and `/reload`, as expected.
+
+### Combat log
+
+| Write | Time | Bytes added | Lines | Newest line age | Oldest line age |
+|---|---|---|---|---|---|
+| 1 | 18:20:00 | 47,906 (incl. header) | 170 | 0.9 s | 41.6 s |
+| 2 | 18:20:42 | 33,075 | 111 | 1.1 s | 39.6 s |
+| 3 | 18:21:47 | 33,434 | 115 | 1.0 s | 64.8 s |
+
+- **Written in batches when a ~32 KB buffer fills, not on a timer.** The newest line in
+  each batch is about 1 s old, so the delay is how long the buffer takes to fill. In a
+  crowded zone that was 40–65 s. Alone or out of combat it will be longer, which likely
+  explains the 4-minute beta report. Not yet measured.
+- **The file starts at once.** `/combatlog` created the file immediately, with a header,
+  `ZONE_CHANGE` and `MAP_CHANGE` timestamped at the moment logging started.
+- **Header:** `COMBAT_LOG_VERSION,22,ADVANCED_LOG_ENABLED,1,BUILD_VERSION,1.60.1,PROJECT_ID,18`.
+- **Most lines are about other people.** Of the first 281 lines, 213 carried a position:
+  41 about the player and 172 about nearby players and mobs. The tracker must keep only
+  lines whose advanced-info GUID is the player's own; the player is the unit flagged
+  `0x511` ("mine"). It must never forward other players' names or positions.
+- **The player's position appeared only in combat lines:** `SWING_DAMAGE` (13),
+  `SWING_DAMAGE_LANDED` (23) and `SPELL_PERIODIC_DAMAGE` (5). Walking without fighting
+  wrote nothing about the player.
+- **Map coordinates need no lookup table.** `MAP_CHANGE` gives the uiMapID and its world
+  bounds, e.g. `MAP_CHANGE,1438,"Teldrassil",11831.25,8437.5,3814.58,-1277.08`
+  (= X top, X bottom, Y left, Y right). For a world position (X, Y):
+  - map x = (Y left − Y) / (Y left − Y right)
+  - map y = (X top − X) / (X top − X bottom)
+
+  Checked against the night elf start at Aldrassil (world 10311, 832), which comes out
+  at 58.6, 44.8 as expected.
+
+### Developer log
+
+`Logs/DeveloperLog.log` stayed at 0 bytes for the whole session. If the `developerLog`
+commands and `C_Log.LogMessage` were run, this route does not write to a file in Forever.
+Unconfirmed whether they were run.
+
+### Still to measure
+
+- Combat log delay in a quiet zone, alone, and while walking without fighting.
+- Whether `/reload` or logout writes out the remaining buffer.
+- The developer log, if it was not tested.
 
 ## Prior art: wow.skysoft.dk
 
@@ -136,6 +192,11 @@ excludes, so this site does not show a new risk-free route.
    - If the developer log writes promptly, add it to the addon and companion.
    - Otherwise, add the combat log tail to the companion. It gives the trail and fight
      details within minutes. Also add an "updated N min ago" note on the map.
+
+   **Update after measuring:** the combat log tail is now the leading option. In a busy
+   zone it lands within about a minute and carries the player's position during fights.
+   It can be built now, filtered to the player's own lines; the Battle.net API test can
+   follow. See [Measurements](#measurements-2026-11-05).
 
 ## Measurements needed
 
