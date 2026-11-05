@@ -1,21 +1,28 @@
 mod config;
+mod history;
 mod store;
 
-use axum::extract::{ConnectInfo, State};
+use axum::extract::{ConnectInfo, Path, Query, State};
 use axum::http::{header, HeaderMap, HeaderValue, Method, StatusCode};
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use config::{Cidr, Config};
+use history::History;
+use serde::Deserialize;
+use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use store::Store;
-use tokio::sync::RwLock;
+use tokio::sync::{broadcast, RwLock};
+use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::{Stream, StreamExt};
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::services::ServeDir;
-use wowtracker_protocol::IngestPayload;
+use wowtracker_protocol::{IngestPayload, TrailPoint};
 
 const USAGE: &str = "\
 wowtracker-backend: receives data from the WowTracker companion and serves it to the website
@@ -36,6 +43,9 @@ struct App {
     allow: Arc<Vec<Cidr>>,
     /// Serializes writes of the state file.
     save_lock: Arc<tokio::sync::Mutex<()>>,
+    history: Arc<History>,
+    /// Pushes (event name, JSON data) to every open /api/stream.
+    events: broadcast::Sender<(&'static str, String)>,
 }
 
 #[tokio::main]
@@ -88,12 +98,21 @@ async fn run() -> Result<(), String> {
 
     let store = Store::load(&cfg.data_file);
     println!("state file: {} ({} character(s) loaded)", cfg.data_file.display(), store.characters.len());
+    let history = History::open(&cfg.history_file)?;
+    // Backfill from the state file (a no-op for anything already stored).
+    let mut backfilled = 0;
+    for c in store.characters.values() {
+        backfilled += history.record_character(c)?;
+    }
+    println!("history: {}{}", cfg.history_file.display(), if backfilled > 0 { format!(" ({backfilled} rows backfilled)") } else { String::new() });
 
     let app = App {
         store: Arc::new(RwLock::new(store)),
         cfg: Arc::new(cfg.clone()),
         allow: Arc::new(allow),
         save_lock: Arc::new(tokio::sync::Mutex::new(())),
+        history: Arc::new(history),
+        events: broadcast::channel(64).0,
     };
 
     let ingest = Router::new()
@@ -103,6 +122,10 @@ async fn run() -> Result<(), String> {
 
     let mut public = Router::new()
         .route("/api/state", get(state))
+        .route("/api/history", get(history_route))
+        .route("/api/sessions", get(sessions_route))
+        .route("/api/sessions/{start}", get(session_route))
+        .route("/api/stream", get(stream))
         .route("/api/health", get(health))
         .with_state(app.clone());
     if let Some(cors) = cors_layer(&cfg.cors_origins)? {
@@ -194,13 +217,40 @@ async fn ingest(
         (0, true) => "combat log position".to_string(),
         (n, _) => format!("{n} character(s)"),
     };
-    let snapshot = {
+    // History gets everything, even a save the current state ignores.
+    let chars = payload.characters.clone();
+    let (snapshot, live) = {
         let mut store = app.store.write().await;
+        let live = payload.live.as_ref().and_then(|l| {
+            let key = store.live_target(l)?;
+            let mut points = l.trail.clone();
+            points.push(TrailPoint { t: l.t, map_id: l.map_id, x: l.x, y: l.y });
+            Some((key, points))
+        });
         let changed = store.apply(payload, unix_now(), app.cfg.trail_max);
-        changed.then(|| store.clone())
+        (changed.then(|| store.clone()), live)
     };
+    let history = app.history.clone();
+    let recorded = tokio::task::spawn_blocking(move || -> Result<usize, String> {
+        let mut n = 0;
+        for c in &chars {
+            n += history.record_character(c)?;
+        }
+        if let Some((key, points)) = live {
+            n += history.record_positions(&key, &points, "combatLog")?;
+        }
+        Ok(n)
+    })
+    .await;
+    match recorded {
+        Ok(Err(e)) => eprintln!("warning: could not write history: {e}"),
+        Err(e) => eprintln!("warning: history task failed: {e}"),
+        Ok(Ok(_)) => {}
+    }
     if let Some(snapshot) = snapshot {
         println!("ingest: {what} from {}", peer.ip());
+        // Tell open pages to fetch the new state.
+        let _ = app.events.send(("update", "{}".into()));
         if let Err(e) = save(&app, &snapshot).await {
             eprintln!("warning: could not save {}: {e}", app.cfg.data_file.display());
         }
@@ -220,6 +270,90 @@ async fn save(app: &App, store: &Store) -> std::io::Result<()> {
 async fn state(State(app): State<App>) -> Response {
     let state = app.store.read().await.public_state(unix_now(), app.cfg.offline_after_seconds);
     ([(header::CACHE_CONTROL, "no-store")], Json(state)).into_response()
+}
+
+#[derive(Deserialize)]
+struct HistoryQuery {
+    /// `Name-Realm`; default: the most recently saved character.
+    char: Option<String>,
+    from: Option<i64>,
+    to: Option<i64>,
+    /// Comma-separated journal kinds.
+    kinds: Option<String>,
+    limit: Option<usize>,
+}
+
+const HISTORY_LIMIT_MAX: usize = 50_000;
+
+/// The requested character if it exists, else the most recently saved one.
+async fn pick_char(app: &App, wanted: Option<&str>) -> Option<String> {
+    let store = app.store.read().await;
+    match wanted {
+        Some(k) => store.characters.contains_key(k).then(|| k.to_string()),
+        None => store.characters.values().max_by_key(|c| c.saved_at.unwrap_or(0)).map(|c| c.key.clone()),
+    }
+}
+
+fn json_no_store<T: serde::Serialize>(v: T) -> Response {
+    ([(header::CACHE_CONTROL, "no-store")], Json(v)).into_response()
+}
+
+fn history_error(e: String) -> Response {
+    eprintln!("warning: history query failed: {e}");
+    (StatusCode::INTERNAL_SERVER_ERROR, "history query failed").into_response()
+}
+
+async fn history_route(State(app): State<App>, Query(q): Query<HistoryQuery>) -> Response {
+    let Some(key) = pick_char(&app, q.char.as_deref()).await else {
+        return (StatusCode::NOT_FOUND, "no such character").into_response();
+    };
+    let kinds: Option<Vec<String>> =
+        q.kinds.map(|k| k.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect());
+    let (from, to) = (q.from.unwrap_or(0), q.to.unwrap_or(i64::MAX));
+    let limit = q.limit.unwrap_or(5_000).min(HISTORY_LIMIT_MAX);
+    let history = app.history.clone();
+    match tokio::task::spawn_blocking(move || history.range(&key, from, to, kinds.as_deref(), limit)).await {
+        Ok(Ok(data)) => json_no_store(data),
+        Ok(Err(e)) => history_error(e),
+        Err(e) => history_error(e.to_string()),
+    }
+}
+
+async fn sessions_route(State(app): State<App>, Query(q): Query<HistoryQuery>) -> Response {
+    let Some(key) = pick_char(&app, q.char.as_deref()).await else {
+        return (StatusCode::NOT_FOUND, "no such character").into_response();
+    };
+    let history = app.history.clone();
+    match tokio::task::spawn_blocking(move || history.sessions(&key)).await {
+        Ok(Ok(list)) => json_no_store(list),
+        Ok(Err(e)) => history_error(e),
+        Err(e) => history_error(e.to_string()),
+    }
+}
+
+async fn session_route(State(app): State<App>, Path(start): Path<i64>, Query(q): Query<HistoryQuery>) -> Response {
+    let Some(key) = pick_char(&app, q.char.as_deref()).await else {
+        return (StatusCode::NOT_FOUND, "no such character").into_response();
+    };
+    let history = app.history.clone();
+    match tokio::task::spawn_blocking(move || history.session(&key, start)).await {
+        Ok(Ok(Some(detail))) => json_no_store(detail),
+        Ok(Ok(None)) => (StatusCode::NOT_FOUND, "no such session").into_response(),
+        Ok(Err(e)) => history_error(e),
+        Err(e) => history_error(e.to_string()),
+    }
+}
+
+/// Server-sent events: `update` when the state changed (fetch /api/state),
+/// `live` with a small live frame when one arrives.
+async fn stream(State(app): State<App>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let rx = BroadcastStream::new(app.events.subscribe());
+    let events = rx.filter_map(|msg| match msg {
+        Ok((name, data)) => Some(Ok(Event::default().event(name).data(data))),
+        // A slow client missed messages: have it refetch everything.
+        Err(_) => Some(Ok(Event::default().event("update").data("{}"))),
+    });
+    Sse::new(events).keep_alive(KeepAlive::default())
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {

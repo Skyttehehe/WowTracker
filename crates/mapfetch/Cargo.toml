@@ -1,0 +1,16 @@
+[package]
+name = "wowtracker-mapfetch"
+description = "Downloads the game's zone map art from wago.tools and stitches it into one image per uiMapID for the website"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "mapfetch"
+path = "src/main.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+ureq = "2"
+texpresso = "2"
+image = { version = "0.25", default-features = false, features = ["jpeg"] }

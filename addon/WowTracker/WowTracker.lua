@@ -11,7 +11,8 @@
 -- Settings (/wt config, or the slash commands below) are stored in the same
 -- file, which is how the companion learns where to send the data.
 
-local ADDON_NAME = ...
+local ADDON_NAME, ns = ...
+ns = ns or {}
 local SCHEMA = 1
 
 local POSITION_INTERVAL = 1   -- seconds between position reads
@@ -27,6 +28,7 @@ local DEFAULT_SETTINGS = {
   endpoint = "",  -- backend ingest address, e.g. "192.168.0.117:1337" or "https://ingest.example.com"
   token = "",     -- shared secret the backend expects (optional)
   trail = true,   -- record a breadcrumb trail of where you have been
+  strip = true,   -- draw the live strip the companion reads off the screen (Strip.lua)
 }
 
 local VERSION = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version")) or "dev"
@@ -65,6 +67,12 @@ local function say(msg)
   print("|cff4fc3f7WoW Tracker:|r " .. msg)
 end
 
+-- Shared with the other files of the addon (Strip.lua).
+ns.now = now
+ns.plain = plain
+ns.char = function() return char end
+ns.db = function() return db end
+
 ---------------------------------------------------------------------------
 -- Data collection
 ---------------------------------------------------------------------------
@@ -92,6 +100,8 @@ local function journal(kind, entry)
   local j = char.journal
   j[#j + 1] = entry
   while #j > JOURNAL_MAX do table.remove(j, 1) end
+  -- Also send it live, so the website shows it without waiting for a save.
+  if ns.strip then ns.strip.journal(entry) end
 end
 
 -- Played time in seconds. Counted while logged in, and corrected whenever the
@@ -416,6 +426,7 @@ local function describeSettings()
   say("endpoint: " .. (s.endpoint ~= "" and s.endpoint or "(not set, the companion's config file is used)"))
   say("token: " .. (s.token ~= "" and ("set (" .. #s.token .. " characters)") or "(not set)"))
   say("trail: " .. (s.trail and "on" or "off"))
+  say("live strip: " .. (s.strip and "on" or "off"))
 end
 
 local function createOptionsPanel()
@@ -493,6 +504,7 @@ local function printHelp()
   say("  /wt endpoint clear      - use the companion's config file instead")
   say("  /wt token <secret>      - token the backend expects (/wt token clear to remove)")
   say("  /wt trail on|off        - record a breadcrumb trail")
+  say("  /wt strip on|off        - live updates through the strip in the top-left corner")
   say("  /wt clear               - delete this character's trail")
   say("  /wt sync                - save now so the website updates (reloads the UI)")
   say("  /wt status              - show what is being tracked")
@@ -534,6 +546,9 @@ SlashCmdList.WOWTRACKER = function(msg)
   elseif cmd == "trail" then
     if rest == "on" or rest == "off" then db.settings.trail = (rest == "on") end
     say("trail: " .. (db.settings.trail and "on" or "off"))
+  elseif cmd == "strip" then
+    if (rest == "on" or rest == "off") and ns.strip then ns.strip.setEnabled(rest == "on") end
+    say("live strip: " .. (db.settings.strip and "on" or "off"))
   elseif cmd == "clear" then
     if char then char.trail = {} end
     say("trail cleared")
@@ -575,6 +590,7 @@ end
 
 function handlers.PLAYER_LOGIN()
   initCharacter()
+  if ns.strip then ns.strip.start() end
 end
 
 function handlers.PLAYER_ENTERING_WORLD(isInitialLogin)

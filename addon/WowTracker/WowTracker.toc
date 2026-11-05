@@ -6,3 +6,4 @@
 ## SavedVariables: WowTrackerDB
 
 WowTracker.lua
+Strip.lua

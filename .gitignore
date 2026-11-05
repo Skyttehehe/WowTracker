@@ -1,6 +1,7 @@
 target/
 *.json.tmp
 wowtracker-state.json
+wowtracker-history.sqlite*
 wowtracker-backend.toml
 wowtracker-companion.toml
 frontend/maps/*

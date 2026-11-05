@@ -1,9 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["crates/protocol", "crates/companion", "crates/backend", "crates/addon-harness"]
+members = ["crates/protocol", "crates/companion", "crates/backend", "crates/mapfetch", "crates/addon-harness"]
 # `cargo build` builds the two apps; the addon test harness compiles Lua from C,
 # so it only builds when asked for (`cargo test -p addon-harness`).
-default-members = ["crates/protocol", "crates/companion", "crates/backend"]
+default-members = ["crates/protocol", "crates/companion", "crates/backend", "crates/mapfetch"]
 
 [workspace.package]
 version = "0.1.0"

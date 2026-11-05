@@ -9,4 +9,6 @@ pub mod combatlog;
 pub mod probe;
 pub mod process;
 pub mod savedvars;
+pub mod strip;
+pub mod capture;
 pub mod upload;

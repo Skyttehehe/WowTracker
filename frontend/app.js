@@ -242,8 +242,20 @@ function renderProgress(c) {
   const rate = xpPerHour(c);
   const eta = rate && c.xpMax ? ((c.xpMax - c.xp) / rate) * 3600 : null;
 
-  const pips = h("div", { class: "pips", "aria-hidden": "true" });
-  for (let i = 1; i <= max; i++) pips.append(h("i", { class: i < c.level ? "done" : i === c.level ? "now" : null }));
+  // The journey to max level: one step per level.
+  const steps = h("div", { class: "journey-steps", style: `grid-template-columns:repeat(${max},1fr)` });
+  for (let i = 1; i <= max; i++) {
+    const cls = i < c.level ? "done" : i === c.level ? "now" : null;
+    const tip = i < c.level ? `Level ${i} · done` : i === c.level ? `Level ${i} · now, ${num(pct, 0)}%` : `Level ${i}`;
+    steps.append(h("i", { class: cls, title: tip },
+      i === c.level ? h("b", { style: `width:${pct}%` }) : null));
+  }
+  const ticks = h("div", { class: "journey-ticks", "aria-hidden": "true" });
+  for (let i = 0; i <= max; i += 10) {
+    const lv = Math.max(1, i);
+    ticks.append(h("span", { style: `left:${((lv - 0.5) / max) * 100}%` }, lv));
+  }
+  const pips = h("div", { class: "journey", role: "img", "aria-label": `Level ${c.level} of ${max}` }, steps, ticks);
 
   el.replaceChildren(
     h("div", { class: "card-head" }, h("h2", null, "Progress"),
@@ -306,8 +318,56 @@ function bar(label, cur, max, cls) {
 // Zone map
 // ---------------------------------------------------------------------------
 
-async function renderMap(c) {
+// The map keeps the same layer elements between renders so the marker can
+// glide to its next position instead of jumping.
+let mapLayers = null;
+let markerAt = null;   // "character|frame" the marker was last placed on
+let mapHover = [];     // [{ x, y, label }] in SVG units, for the tooltip
+let mapScale = 1;      // SVG units per on-screen marker unit
+
+function mapSvg() {
   const svg = document.getElementById("map");
+  if (!mapLayers) {
+    mapLayers = {
+      base: s("g"),
+      trail: s("g"),
+      deaths: s("g"),
+      marker: s("g", { class: "marker" },
+        s("circle", { class: "ring", r: 14 }),
+        s("circle", { class: "dot", r: 9, "stroke-width": 4 }),
+        s("title")),
+    };
+    svg.replaceChildren(mapLayers.base, mapLayers.trail, mapLayers.deaths, mapLayers.marker);
+    svg.addEventListener("pointermove", onMapHover);
+    svg.addEventListener("pointerleave", () => { document.getElementById("map-tip").hidden = true; });
+  }
+  return svg;
+}
+
+function onMapHover(ev) {
+  const svg = ev.currentTarget;
+  const tip = document.getElementById("map-tip");
+  const ctm = svg.getScreenCTM();
+  if (!ctm || !mapHover.length) { tip.hidden = true; return; }
+  const p = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(ctm.inverse());
+  let best = null;
+  let bd = Infinity;
+  for (const q of mapHover) {
+    const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+    if (d < bd) { bd = d; best = q; }
+  }
+  const r = 18 * mapScale;
+  if (!best || bd > r * r) { tip.hidden = true; return; }
+  const box = svg.parentElement.getBoundingClientRect();
+  const at = new DOMPoint(best.x, best.y).matrixTransform(ctm);
+  tip.textContent = best.label;
+  tip.hidden = false;
+  tip.style.left = `${at.x - box.left}px`;
+  tip.style.top = `${at.y - box.top}px`;
+}
+
+async function renderMap(c) {
+  const svg = mapSvg();
   const $ = (id) => document.getElementById(id);
   const hasPos = c && c.mapID && maps[c.mapID] && maps[c.mapID].min;
 
@@ -322,8 +382,13 @@ async function renderMap(c) {
     : "";
 
   if (!hasPos) {
-    svg.replaceChildren(s("text", { x: W / 2, y: H / 2, fill: "#8d95a3", "font-size": 34, "text-anchor": "middle" },
+    mapLayers.base.replaceChildren(s("text", { x: W / 2, y: H / 2, fill: "#8d95a3", "font-size": 34, "text-anchor": "middle" },
       c ? "No position yet. Move around in game, then /wt sync." : "Waiting for data…"));
+    mapLayers.trail.replaceChildren();
+    mapLayers.deaths.replaceChildren();
+    mapLayers.marker.style.display = "none";
+    markerAt = null;
+    mapHover = [];
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     svg.style.aspectRatio = "3 / 2";
     return;
@@ -352,6 +417,7 @@ async function renderMap(c) {
 
   // Trail: break the line on long gaps or when leaving this frame.
   const segments = [];
+  const hover = [];
   let seg = [];
   let lastT = null;
   for (const p of c.trail || []) {
@@ -360,7 +426,11 @@ async function renderMap(c) {
       if (seg.length > 1) segments.push(seg);
       seg = [];
     }
-    if (pt) seg.push(pt);
+    if (pt) {
+      seg.push(pt);
+      const other = p.mapID !== c.mapID && maps[p.mapID] ? ` · ${maps[p.mapID].name}` : "";
+      hover.push({ x: pt[0], y: pt[1], label: `${clock(p.t)} · ${(p.x * 100).toFixed(1)}, ${(p.y * 100).toFixed(1)}${other}` });
+    }
     lastT = p.t;
   }
   if (seg.length > 1) segments.push(seg);
@@ -395,23 +465,49 @@ async function renderMap(c) {
         s("title", null, z.m.name)));
     }
   }
-  svg.replaceChildren(layer);
+  mapLayers.base.replaceChildren(layer);
   svg.setAttribute("viewBox", `${vb.x.toFixed(0)} ${vb.y.toFixed(0)} ${vb.w.toFixed(0)} ${vb.h.toFixed(0)}`);
   svg.style.aspectRatio = "3 / 2";
   const k = Math.max(vb.w / W, vb.h / H); // keep markers the same on-screen size
+  mapScale = k;
 
-  for (const pts of segments) {
-    svg.append(s("polyline", {
-      class: `trail${artUrl ? "" : " on-schematic"}`, "stroke-width": 3 * k,
-      points: pts.map((p) => p.map((v) => v.toFixed(1)).join(",")).join(" "),
-    }));
+  mapLayers.trail.replaceChildren(...segments.map((pts) => s("polyline", {
+    class: `trail${artUrl ? "" : " on-schematic"}`, "stroke-width": 3 * k,
+    points: pts.map((p) => p.map((v) => v.toFixed(1)).join(",")).join(" "),
+  })));
+
+  // Deaths with a recorded position on this map.
+  const deaths = [];
+  for (const e of c.journal || []) {
+    if (e.kind !== "death" || !e.mapID || e.x == null || e.y == null) continue;
+    const pt = project(frame, e.mapID, e.x, e.y);
+    if (!pt) continue;
+    const label = `Died at level ${e.level ?? "?"} · ${clock(e.t)}${e.subzone ? ` · ${e.subzone}` : ""}`;
+    hover.push({ x: pt[0], y: pt[1], label });
+    deaths.push(s("g", { class: "death-mark", transform: `translate(${pt[0].toFixed(1)} ${pt[1].toFixed(1)}) scale(${k})` },
+      s("circle", { r: 9 }),
+      s("path", { d: "M-4,-4L4,4M4,-4L-4,4" })));
   }
+  mapLayers.deaths.replaceChildren(...deaths);
+  mapHover = hover;
+
+  const mk = mapLayers.marker;
   if (pos) {
     const stale = c.hasPosition === false;
-    svg.append(s("g", { class: `marker${c.online ? " online" : ""}${stale ? " stale" : ""}` },
-      s("circle", { class: "ring", cx: pos[0], cy: pos[1], r: 14 * k }),
-      s("circle", { class: "dot", cx: pos[0], cy: pos[1], r: 9 * k, "stroke-width": 4 * k }),
-      s("title", null, stale ? `${c.name}: last known position` : c.name)));
+    const at = `${c.key}|${frameId}`;
+    const jump = markerAt !== at; // new character or map: no glide
+    markerAt = at;
+    mk.style.display = "";
+    mk.setAttribute("class", `marker${c.online ? " online" : ""}${stale ? " stale" : ""}${jump ? " jump" : ""}`);
+    mk.style.transform = `translate(${pos[0].toFixed(1)}px, ${pos[1].toFixed(1)}px) scale(${k})`;
+    mk.lastChild.textContent = stale ? `${c.name}: last known position` : c.name;
+    if (jump) {
+      mk.getBoundingClientRect(); // apply the jump before turning the glide back on
+      requestAnimationFrame(() => mk.classList.remove("jump"));
+    }
+  } else {
+    mk.style.display = "none";
+    markerAt = null;
   }
 }
 

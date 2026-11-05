@@ -55,15 +55,19 @@ impl Store {
         changed
     }
 
-    /// Attaches a combat log position to its character: by GUID when the
-    /// addon has recorded one, else the most recently saved character.
-    fn apply_live(&mut self, mut live: LivePosition, trail_max: usize) -> bool {
-        let key = self
-            .characters
+    /// The character a live position belongs to: by GUID when the addon has
+    /// recorded one, else the most recently saved character.
+    pub fn live_target(&self, live: &LivePosition) -> Option<String> {
+        self.characters
             .values()
             .find(|c| c.guid.is_some() && c.guid == live.guid)
             .or_else(|| self.characters.values().max_by_key(|c| c.saved_at.unwrap_or(0)))
-            .map(|c| c.key.clone());
+            .map(|c| c.key.clone())
+    }
+
+    /// Attaches a combat log position to its character.
+    fn apply_live(&mut self, mut live: LivePosition, trail_max: usize) -> bool {
+        let key = self.live_target(&live);
         let Some(c) = key.and_then(|k| self.characters.get_mut(&k)) else { return false };
         if c.live.as_ref().is_some_and(|l| l.t >= live.t) {
             return false;

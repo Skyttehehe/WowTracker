@@ -222,6 +222,7 @@ impl Companion {
             game_running,
             characters: data.characters.clone(),
             live: None,
+            strip: None,
         };
 
         if self.args.dry_run {
@@ -323,6 +324,7 @@ impl Companion {
             game_running,
             characters: Vec::new(),
             live: Some(live.clone()),
+            strip: None,
         };
         let mut ok = false;
         for t in &self.targets {
@@ -358,6 +360,7 @@ impl Companion {
             game_running,
             characters: Vec::new(),
             live: None,
+            strip: None,
         };
         let mut failed = BTreeSet::new();
         for t in &self.targets {

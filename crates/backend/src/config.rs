@@ -35,6 +35,9 @@ cors_origins = []
 # Where the last known state is kept between restarts.
 data_file = "wowtracker-state.json"
 
+# SQLite file with everything ever received (trail, journal, XP, sessions).
+history_file = "wowtracker-history.sqlite"
+
 # If the companion has not been heard from for this long, the player counts as offline.
 offline_after_seconds = 120
 
@@ -52,6 +55,7 @@ pub struct Config {
     pub frontend_dir: String,
     pub cors_origins: Vec<String>,
     pub data_file: PathBuf,
+    pub history_file: PathBuf,
     pub offline_after_seconds: i64,
     pub trail_max: usize,
 }
@@ -69,6 +73,7 @@ impl Default for Config {
             frontend_dir: String::new(),
             cors_origins: Vec::new(),
             data_file: PathBuf::from("wowtracker-state.json"),
+            history_file: PathBuf::from("wowtracker-history.sqlite"),
             offline_after_seconds: 120,
             trail_max: 2000,
         }
@@ -98,6 +103,9 @@ impl Config {
         }
         if let Some(v) = env("WOWTRACKER_DATA_FILE") {
             self.data_file = PathBuf::from(v);
+        }
+        if let Some(v) = env("WOWTRACKER_HISTORY_FILE") {
+            self.history_file = PathBuf::from(v);
         }
     }
 

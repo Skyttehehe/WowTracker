@@ -72,6 +72,8 @@ pub struct Character {
 
     /// Latest position read from the combat log. Set by the backend, not the addon.
     pub live: Option<LivePosition>,
+    /// Time of the last live strip frame applied to this character. Set by the backend.
+    pub strip_at: Option<i64>,
 }
 
 /// One quest in the quest log.
@@ -204,6 +206,52 @@ pub struct IngestPayload {
     pub characters: Vec<Character>,
     /// New position from the combat log, if any.
     pub live: Option<LivePosition>,
+    /// The latest state read from the addon's live strip, if any.
+    pub strip: Option<LiveFrame>,
+}
+
+/// The character's state as read from the addon's live strip (the coloured
+/// squares in the top-left corner of the game window), about once a second.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LiveFrame {
+    /// The game's server time when the frame was drawn (Unix seconds).
+    pub t: i64,
+    /// From the identity message; missing until the first one has been read.
+    pub key: Option<String>,
+    pub guid: Option<String>,
+    pub name: Option<String>,
+    pub realm: Option<String>,
+    pub class: Option<String>,
+    pub class_file: Option<String>,
+    pub race: Option<String>,
+    pub faction: Option<String>,
+
+    pub level: u32,
+    pub xp: u64,
+    pub xp_max: u64,
+    pub rested: u64,
+    /// Copper.
+    pub money: u64,
+    #[serde(rename = "mapID")]
+    pub map_id: u32,
+    pub x: f64,
+    pub y: f64,
+    pub has_position: bool,
+    pub in_combat: bool,
+    pub dead: bool,
+    pub ghost: bool,
+    pub resting: bool,
+
+    pub zone: Option<String>,
+    pub subzone: Option<String>,
+    pub instance: Option<String>,
+    /// The whole quest log, when it changed since the last send.
+    pub quests: Option<Vec<Quest>>,
+    /// Journal entries read since the last send, oldest first.
+    pub events: Vec<JournalEntry>,
+    /// Positions since the last send, oldest first (the current one is x/y).
+    pub trail: Vec<TrailPoint>,
 }
 
 /// Body of the public `GET /api/state`.
