@@ -70,9 +70,40 @@ pub fn resolve_game_dir(path: &Path) -> Option<PathBuf> {
     best_flavor(path)
 }
 
+/// Reads the `InstallPath` value from `reg query` output. Battle.net stores the
+/// last-used flavor folder there (e.g. `E:\Games\World of Warcraft\_forever_\`).
+pub fn parse_reg_install_path(output: &str) -> Option<PathBuf> {
+    output.lines().find_map(|line| {
+        let rest = line.trim_start().strip_prefix("InstallPath")?;
+        let value = rest.trim_start().strip_prefix("REG_SZ")?.trim();
+        (!value.is_empty()).then(|| PathBuf::from(value.trim_end_matches('\\')))
+    })
+}
+
+/// Install folder recorded by Battle.net in the Windows registry, if any.
+fn registry_root() -> Option<PathBuf> {
+    let out = std::process::Command::new("reg")
+        .args([
+            "query",
+            r"HKLM\SOFTWARE\WOW6432Node\Blizzard Entertainment\World of Warcraft",
+            "/v",
+            "InstallPath",
+        ])
+        .output()
+        .ok()?;
+    let path = parse_reg_install_path(&String::from_utf8_lossy(&out.stdout))?;
+    // The value usually points at a flavor folder; its parent holds all flavors.
+    if is_flavor_dir(&path) {
+        path.parent().map(Path::to_path_buf)
+    } else {
+        Some(path)
+    }
+}
+
 fn install_roots() -> Vec<PathBuf> {
     let mut roots = Vec::new();
     if cfg!(windows) {
+        roots.extend(registry_root());
         for drive in b'C'..=b'H' {
             let d = format!("{}:\\", drive as char);
             if !Path::new(&d).exists() {
@@ -156,5 +187,16 @@ mod tests {
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("WowTracker.lua"));
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn parses_registry_install_path() {
+        let out = "\r\nHKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Blizzard Entertainment\\World of Warcraft\r\n    \
+                   InstallPath    REG_SZ    E:\\Wowclassic\\World of Warcraft\\_forever_\\\r\n\r\n";
+        assert_eq!(
+            parse_reg_install_path(out),
+            Some(PathBuf::from("E:\\Wowclassic\\World of Warcraft\\_forever_"))
+        );
+        assert_eq!(parse_reg_install_path("ERROR: The system was unable to find the specified registry key"), None);
     }
 }

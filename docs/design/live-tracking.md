@@ -84,6 +84,41 @@ one and a few minutes.
   status line every few seconds. That would be the best risk-free channel.
 - **Status.** Completely untested.
 
+## Prior art: wow.skysoft.dk
+
+[wow.skysoft.dk](https://wow.skysoft.dk/) is another person's Forever tracker that does
+update every second. It was examined on 2026-11-05 using only what it serves to any
+visitor: the page, `app.js`, `/api/state`, `/api/history` and `/api/stream`.
+
+**Observed:**
+
+- **One snapshot a second.** The page keeps a server-sent event stream open
+  (`/api/stream`, event `live`). Each event carries a full snapshot: map ID, x/y to 4
+  decimals, level, XP, gold, combat, dead/ghost, zone and subzone. Separate `update`
+  events trigger a full reload of state and history.
+- **Live in-game changes.** Over 12 seconds of polling while the character fought, XP rose
+  with each kill (1544 → 1563 → 1582 → 1601), combat switched on and off, and the
+  position moved. `updatedAt` was never more than 1 second behind the server clock.
+- **The source is an addon.** Current health and power are always `null`, matching
+  Forever's secret values. The page itself says "Live data from an in-game addon". Memory
+  reading would have the real numbers.
+- **Stack.** A Python backend ("ForeverTracker/0.1") behind Caddy. The upload endpoint is
+  not public, and no source code was found.
+
+**Inferred (not proven):** the data leaves the game every second, but addons can't make
+network requests or write files during play, and the combat log is minutes behind with
+no XP in it. The remaining explanation is screen reading: the addon draws the data as
+pixels or text, and a program on the PC captures it. That is the pixel route this design
+excludes, so this site does not show a new risk-free route.
+
+**Features worth borrowing** (all work with SavedVariables):
+
+- quest log with objectives;
+- journal of quests, levels, zones, logins and deaths;
+- XP per hour and time-to-next-level estimate;
+- levelling-curve chart by played time;
+- "Live" / "Online" / "Offline" pill with "last update N ago".
+
 ## Recommendation
 
 1. **Keep option 0** as the baseline. It is complete and reliable.
