@@ -35,6 +35,12 @@ heartbeat_seconds = 30
 
 # Process names that count as "the game is running".
 process_names = ["Wow.exe", "WowForever.exe", "WowF.exe", "WowT.exe", "WowB.exe", "WowClassic.exe"]
+
+# Read your position from the game's combat log between saves. Only lines about
+# your own character are used. In game: /console advancedCombatLogging 1, then
+# /combatlog. The game writes the log in batches, about once a minute in a busy
+# zone, so the map updates within a minute or so while you fight.
+combat_log = true
 "#;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +53,7 @@ pub struct Config {
     pub poll_seconds: u64,
     pub heartbeat_seconds: u64,
     pub process_names: Vec<String>,
+    pub combat_log: bool,
 }
 
 impl Default for Config {
@@ -62,6 +69,7 @@ impl Default for Config {
                 .into_iter()
                 .map(String::from)
                 .collect(),
+            combat_log: true,
         }
     }
 }

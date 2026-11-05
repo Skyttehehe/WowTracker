@@ -130,6 +130,10 @@ function UnitXPMax() return Mock.player.xpMax end
 function GetXPExhaustion() if Mock.player.rested > 0 then return Mock.player.rested end return nil end
 function IsResting() return Mock.player.resting end
 function UnitClass() return Mock.player.className, Mock.player.classFile end
+function UnitGUID(unit)
+  if unit == "player" then return Mock.player.guid or "Player-6940-00AF5B76" end
+  return nil
+end
 function UnitRace() return Mock.player.race, Mock.player.race end
 function UnitFactionGroup() return Mock.player.faction end
 function UnitAffectingCombat() return Mock.inCombat end

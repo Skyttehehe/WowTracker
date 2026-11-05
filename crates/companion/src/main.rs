@@ -5,7 +5,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use wowtracker_companion::config::{self, Args, Config};
 use wowtracker_companion::savedvars::{read_addon_data, AddonData};
-use wowtracker_companion::{discover, process, upload};
+use wowtracker_companion::{combatlog, discover, process, upload};
 use wowtracker_protocol::IngestPayload;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -100,10 +100,14 @@ struct Companion {
     last_heartbeat: Option<Instant>,
     last_game_running: Option<bool>,
     warned_no_files: bool,
+    combat: Option<combatlog::Reader>,
+    /// A combat log position that could not be sent yet.
+    unsent_live: Option<wowtracker_protocol::LivePosition>,
 }
 
 impl Companion {
     fn new(cfg: Config, args: Args, game_dir: PathBuf) -> Self {
+        let combat = cfg.combat_log.then(|| combatlog::Reader::new(&game_dir));
         Companion {
             cfg,
             args,
@@ -113,16 +117,22 @@ impl Companion {
             last_heartbeat: None,
             last_game_running: None,
             warned_no_files: false,
+            combat,
+            unsent_live: None,
         }
     }
 
     fn run(&mut self) -> Result<(), String> {
         if !(self.args.once || self.args.dry_run) {
             log("watching for changes (Ctrl+C to stop). In game: /wt sync or /reload to send an update.");
+            if self.combat.is_some() {
+                log("also reading your position from the combat log (in game: /combatlog with advanced logging on)");
+            }
         }
         loop {
             let game_running = process::game_running(&self.cfg.process_names);
             let sent_any = self.check_files(game_running)?;
+            self.check_combat_log(game_running);
 
             if self.args.once || self.args.dry_run {
                 if !sent_any && !self.args.dry_run {
@@ -211,6 +221,7 @@ impl Companion {
             sent_at: unix_now(),
             game_running,
             characters: data.characters.clone(),
+            live: None,
         };
 
         if self.args.dry_run {
@@ -264,21 +275,89 @@ impl Companion {
         Err("no backend address. Set it in game with /wt endpoint <ip:port>, or endpoint in the config file".into())
     }
 
-    fn heartbeat(&mut self, game_running: Option<bool>) {
-        self.last_heartbeat = Some(Instant::now());
+    /// Reads new combat log lines and sends the newest position of the player.
+    fn check_combat_log(&mut self, game_running: Option<bool>) {
+        let Some(reader) = self.combat.as_mut() else { return };
+        for note in reader.poll() {
+            log(&note);
+        }
+        let Some(mut live) = reader.parser.take_update() else {
+            if let Some(pending) = self.unsent_live.take() {
+                self.send_live(pending, game_running);
+            }
+            return;
+        };
+        // Keep breadcrumbs from an update that could not be sent earlier.
+        if let Some(old) = self.unsent_live.take() {
+            let mut trail = old.trail;
+            trail.push(wowtracker_protocol::TrailPoint { t: old.t, map_id: old.map_id, x: old.x, y: old.y });
+            trail.append(&mut live.trail);
+            live.trail = trail;
+        }
+        if self.args.dry_run {
+            println!("Would send this combat log position:");
+            println!("{}", serde_json::to_string_pretty(&live).unwrap_or_default());
+            return;
+        }
+        self.send_live(live, game_running);
+    }
+
+    fn send_live(&mut self, live: wowtracker_protocol::LivePosition, game_running: Option<bool>) {
+        self.ensure_targets();
         if self.targets.is_empty() {
-            // Nothing sent yet; fall back to an explicitly configured address.
+            self.unsent_live = Some(live);
+            return;
+        }
+        let age = unix_now() - live.t;
+        let summary = format!(
+            "{} {:.1}, {:.1}{} ({}s old)",
+            live.map.as_deref().unwrap_or("?"),
+            live.x * 100.0,
+            live.y * 100.0,
+            live.opponent.as_deref().map(|o| format!(", fighting {o}")).unwrap_or_default(),
+            age
+        );
+        let payload = IngestPayload {
+            companion_version: VERSION.to_string(),
+            sent_at: unix_now(),
+            game_running,
+            characters: Vec::new(),
+            live: Some(live.clone()),
+        };
+        let mut ok = false;
+        for t in &self.targets {
+            match upload::send(&t.url, t.token.as_deref(), &payload) {
+                Ok(()) => ok = true,
+                Err(e) => log(&format!("combat log: {e}")),
+            }
+        }
+        if ok {
+            log(&format!("combat log: sent position {summary}"));
+        } else {
+            self.unsent_live = Some(live);
+        }
+    }
+
+    /// Before any SavedVariables were sent, fall back to an explicitly configured address.
+    fn ensure_targets(&mut self) {
+        if self.targets.is_empty() {
             if let Some(e) = self.args.endpoint.clone().or(self.cfg.endpoint.clone()) {
                 if let Ok(url) = upload::ingest_url(&e) {
                     self.targets.push(Target { url, token: self.args.token.clone().or(self.cfg.token.clone()) });
                 }
             }
         }
+    }
+
+    fn heartbeat(&mut self, game_running: Option<bool>) {
+        self.last_heartbeat = Some(Instant::now());
+        self.ensure_targets();
         let payload = IngestPayload {
             companion_version: VERSION.to_string(),
             sent_at: unix_now(),
             game_running,
             characters: Vec::new(),
+            live: None,
         };
         let mut failed = BTreeSet::new();
         for t in &self.targets {

@@ -13,6 +13,8 @@ pub struct Character {
     pub key: String,
     pub name: String,
     pub realm: String,
+    /// `Player-<server>-<id>`, used to match combat log lines.
+    pub guid: Option<String>,
     pub class: Option<String>,
     /// Locale-independent class token, e.g. `WARRIOR`.
     pub class_file: Option<String>,
@@ -48,6 +50,34 @@ pub struct Character {
     pub login_at: Option<i64>,
     pub saved_at: Option<i64>,
 
+    pub trail: Vec<TrailPoint>,
+
+    /// Latest position read from the combat log. Set by the backend, not the addon.
+    pub live: Option<LivePosition>,
+}
+
+/// The player's position from the game's combat log (advanced logging on).
+/// The companion only ever reads the player's own lines from the log.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LivePosition {
+    /// When the logged event happened (Unix seconds).
+    pub t: i64,
+    /// The player's GUID as written in the log.
+    pub guid: Option<String>,
+    /// `Name-Realm` as written in the log.
+    pub name: Option<String>,
+    #[serde(rename = "mapID")]
+    pub map_id: u32,
+    /// Map name from the log's MAP_CHANGE line.
+    pub map: Option<String>,
+    /// Normalized (0..1) position on `map_id`.
+    pub x: f64,
+    pub y: f64,
+    /// Name of the creature in that line (never another player).
+    pub opponent: Option<String>,
+    /// Earlier positions since the previous update, oldest first. The backend
+    /// moves these into the character's trail and stores this list empty.
     pub trail: Vec<TrailPoint>,
 }
 
@@ -96,6 +126,8 @@ pub struct IngestPayload {
     /// Whether a WoW process is running on the player's PC.
     pub game_running: Option<bool>,
     pub characters: Vec<Character>,
+    /// New position from the combat log, if any.
+    pub live: Option<LivePosition>,
 }
 
 /// Body of the public `GET /api/state`.
@@ -117,4 +149,6 @@ pub struct PublicCharacter {
     pub character: Character,
     /// Logged in right now, as far as the backend can tell.
     pub online: bool,
+    /// Where `mapID`/`x`/`y`/`positionAt` came from: "addon" or "combatLog".
+    pub position_source: Option<String>,
 }

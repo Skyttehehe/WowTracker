@@ -42,9 +42,17 @@ move), so each save uploads the whole route since the last one. The companion al
 the backend whether the game is running, so the site shows "Offline" soon after you close
 the game, even after a crash.
 
+**Between saves, the combat log fills in your position while you fight.** With
+`/combatlog` and advanced combat logging on, the game writes a combat log that includes
+your position on most fight lines. The game writes it in batches. In a busy zone that
+was every 40–65 seconds when measured, so the map follows you within about a minute
+while you fight. Walking without fighting adds nothing. The companion reads only the
+lines about your own character, never other players' names or positions. This is the
+same file Warcraft Logs reads, so it carries no Terms-of-Service risk.
+
 A live (every second) version would need a screen-reading technique that is a grey area
 under Blizzard's terms. This project deliberately does not do that; see
-[the research notes](docs/research/wow-classic-live-tracker.md#4-getting-data-out-of-the-game).
+[the design notes](docs/design/live-tracking.md).
 
 **Forever hides some combat data from addons.** During combat the game gives addons
 "secret" values for an NPC's name, type and health. The addon records your target before

@@ -91,6 +91,7 @@ fn full_session_with_reload() {
     let c = &data.characters[0];
     assert_eq!(c.key, "Testchar-Firemaw");
     assert_eq!(c.class_file.as_deref(), Some("WARRIOR"));
+    assert_eq!(c.guid.as_deref(), Some("Player-6940-00AF5B76"), "GUID for matching combat log lines");
     assert_eq!(c.level, Some(11));
     assert_eq!(c.xp, Some(200));
     assert_eq!(c.xp_max, Some(7500));

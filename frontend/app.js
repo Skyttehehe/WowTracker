@@ -307,22 +307,35 @@ function renderPanel(c) {
   const inInstance = c.instance && c.instance !== "none";
   const coords = c.x != null && c.hasPosition !== false ? `${(c.x * 100).toFixed(1)}, ${(c.y * 100).toFixed(1)}` : null;
   const lastMap = maps[c.mapID];
+  const fromLog = c.positionSource === "combatLog";
   const where = h("div", { class: "block" },
     h("h3", null, "Location"),
     h("p", null, c.zone || "Unknown"),
     h("p", { class: "sub" }, [c.subzone, coords].filter(Boolean).join(" · ") || " "),
-    inInstance ? h("p", { class: "sub" }, `In a ${INSTANCE[c.instance] || "instance"}. The map shows the last outdoor position${lastMap ? ` (${lastMap.name})` : ""}.`) : null);
+    c.positionAt ? h("p", { class: "sub" }, `${fromLog ? "From the combat log" : "From the last save"} · ${ago(c.positionAt)}`) : null,
+    inInstance && !fromLog ? h("p", { class: "sub" }, `In a ${INSTANCE[c.instance] || "instance"}. The map shows the last outdoor position${lastMap ? ` (${lastMap.name})` : ""}.`) : null);
+
+  // Opponent from the combat log, when newer than the addon's last fight.
+  const live = c.live;
+  const lf = c.lastFight;
+  const addonFightAt = lf ? lf.endedAt || lf.startedAt || 0 : 0;
+  const logFight = live && live.opponent && live.t > addonFightAt && live.t > (c.savedAt || 0) ? live : null;
 
   // Target / fight
   let fight = null;
-  if (c.online && c.inCombat) {
+  if (logFight && c.online && nowServer() - logFight.t < 180) {
+    fight = h("div", { class: "block" }, h("h3", null, "Fighting"), h("p", { class: "hostile" }, logFight.opponent),
+      h("p", { class: "sub" }, `${ago(logFight.t)} · from the combat log`));
+  } else if (c.online && c.inCombat) {
     fight = c.target ? unitBlock(c.target, "Fighting") : h("div", { class: "block" }, h("h3", null, "Fighting"), h("p", null, "Something (no target)"));
   } else if (c.target && c.online) {
     fight = unitBlock(c.target, "Target");
   }
   let last = null;
-  const lf = c.lastFight;
-  if (lf && lf.startedAt && !(c.online && c.inCombat)) {
+  if (logFight && !fight) {
+    last = h("div", { class: "block" }, h("h3", null, "Last fight"), h("p", { class: "hostile" }, logFight.opponent),
+      h("p", { class: "sub" }, `${ago(logFight.t)} · from the combat log`));
+  } else if (lf && lf.startedAt && !(c.online && c.inCombat) && !logFight) {
     const when = h("p", { class: "sub" }, `${ago(lf.endedAt || lf.startedAt)}${lf.endedAt ? ` · lasted ${duration(lf.endedAt - lf.startedAt)}` : ""}`);
     last = lf.target ? unitBlock(lf.target, "Last fight", when) : h("div", { class: "block" }, h("h3", null, "Last fight"), h("p", null, "Unknown opponent"), when);
   }
@@ -354,9 +367,9 @@ function renderFooter() {
   const el = document.getElementById("updated");
   if (!state) { el.textContent = ""; return; }
   const c = selected();
-  el.textContent = c
-    ? `Updates when you /reload, /wt sync or log out in game. Last save ${ago(c.savedAt)}.`
-    : "";
+  if (!c) { el.textContent = ""; return; }
+  const log = c.live ? ` Combat log position ${ago(c.live.t)}.` : "";
+  el.textContent = `Updates when you /reload, /wt sync or log out in game, and from the combat log while you fight. Last save ${ago(c.savedAt)}.${log}`;
 }
 
 function render() {

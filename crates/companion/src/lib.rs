@@ -5,6 +5,7 @@
 pub mod config;
 pub mod discover;
 pub mod lua;
+pub mod combatlog;
 pub mod probe;
 pub mod process;
 pub mod savedvars;

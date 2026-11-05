@@ -83,6 +83,22 @@ Useful flags:
 | `--once` | Send once and exit (good for checking the token). |
 | `--endpoint`, `--token`, `--wow-path` | Override the config and in-game settings. |
 
+**Position from the combat log (recommended).** The companion also reads your position
+from the game's combat log between saves. Turn the log on in game:
+
+```
+/console advancedCombatLogging 1
+/combatlog
+```
+
+The first command is a saved setting. `/combatlog` is normally switched off when you log
+out, so type it again after logging in. (Not yet checked in Forever.)
+The companion prints `combat log: sent position ...` each time the game writes a batch,
+which was about once a minute in a busy zone. It uses only lines about your own
+character. To turn this off, set `combat_log = false` in the companion config. The log
+file grows while logging is on (about 0.5 MB per 10 minutes in a busy zone), so delete old
+`Logs\WoWCombatLog-*.txt` files now and then.
+
 **Start it with Windows.** Press Win+R, type `shell:startup`, and put a shortcut to
 `wowtracker-companion.exe` there.
 

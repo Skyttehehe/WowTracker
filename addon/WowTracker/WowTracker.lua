@@ -199,6 +199,8 @@ local function initCharacter()
   local className, classFile = UnitClass("player")
   char.key, char.name, char.realm = key, name, realm
   char.class, char.classFile = className, classFile
+  -- Lets the companion match combat log lines to this character.
+  char.guid = plain(UnitGUID("player"))
   char.race = UnitRace("player")
   char.faction = UnitFactionGroup("player")
   char.status = "online"

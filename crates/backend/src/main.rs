@@ -190,14 +190,17 @@ async fn ingest(
         Err(e) => return (StatusCode::BAD_REQUEST, e.body_text()).into_response(),
     };
 
-    let count = payload.characters.len();
+    let what = match (payload.characters.len(), payload.live.is_some()) {
+        (0, true) => "combat log position".to_string(),
+        (n, _) => format!("{n} character(s)"),
+    };
     let snapshot = {
         let mut store = app.store.write().await;
         let changed = store.apply(payload, unix_now(), app.cfg.trail_max);
         changed.then(|| store.clone())
     };
     if let Some(snapshot) = snapshot {
-        println!("ingest: {count} character(s) from {}", peer.ip());
+        println!("ingest: {what} from {}", peer.ip());
         if let Err(e) = save(&app, &snapshot).await {
             eprintln!("warning: could not save {}: {e}", app.cfg.data_file.display());
         }

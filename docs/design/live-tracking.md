@@ -1,6 +1,6 @@
 # Design research: how live can the tracker be?
 
-Status: research done; first in-game measurements in (2026-11-05), quiet-area test pending
+Status: combat log reader built (2026-11-05); quiet-area measurement still pending
 
 ## Problem
 
@@ -197,6 +197,19 @@ excludes, so this site does not show a new risk-free route.
    zone it lands within about a minute and carries the player's position during fights.
    It can be built now, filtered to the player's own lines; the Battle.net API test can
    follow. See [Measurements](#measurements-2026-11-05).
+
+   **Built (2026-11-05):**
+   - **Companion** (`crates/companion/src/combatlog.rs`): follows the newest log file and
+     identifies the player by the "mine" flags. It keeps only lines whose advanced block
+     is the player's, converts positions with the `MAP_CHANGE` bounds, and sends the newest
+     position plus breadcrumbs each time a batch arrives.
+   - **Opponent names:** creature names only, never other players'.
+   - **Backend:** attaches the position to the character by GUID (the addon now records
+     `UnitGUID("player")`), or to the most recently saved character. It shows whichever
+     of the addon or combat log positions is newer, and keeps combat log breadcrumbs
+     across later saves.
+   - **Website:** says which source the position came from and how old it is, and shows
+     the latest opponent from the log.
 
 ## Measurements needed
 
