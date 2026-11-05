@@ -67,6 +67,10 @@ fn run(args: Args) -> Result<(), String> {
     };
     log(&format!("game folder: {}", game_dir.display()));
 
+    if args.probe {
+        return wowtracker_companion::probe::run(&game_dir, args.show_lines);
+    }
+
     let mut companion = Companion::new(cfg, args, game_dir);
     companion.run()
 }
@@ -294,6 +298,5 @@ fn unix_now() -> i64 {
 }
 
 fn log(msg: &str) {
-    let s = unix_now().rem_euclid(86_400);
-    println!("[{:02}:{:02}:{:02} UTC] {msg}", s / 3600, (s / 60) % 60, s % 60);
+    println!("[{}] {msg}", chrono::Local::now().format("%H:%M:%S"));
 }

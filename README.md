@@ -25,6 +25,7 @@ what you are fighting and your recent route.
 | [frontend](frontend) | Static website (no build step). Works behind Caddy or on Vercel. |
 | [crates/addon-harness](crates/addon-harness) | Tests that run the addon in real Lua 5.1 against a fake WoW API. |
 | [docs/setup.md](docs/setup.md) | Step-by-step setup for both hosting styles. |
+| [docs/design/live-tracking.md](docs/design/live-tracking.md) | How live the map can get without any ToS risk: options, recommendation, what to measure. |
 | [docs/research](docs/research) | Research notes: Forever's addon API, ways to get data out, map maths. |
 
 ## How fresh is the data?

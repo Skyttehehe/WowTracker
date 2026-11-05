@@ -132,6 +132,45 @@ To skip the rewrite and call the API host directly instead:
 - set `apiBase: "https://wowtracker-api.osrs.dk/api"` in `config.js`;
 - add `cors_origins = ["https://wowtracker.osrs.dk"]` to the backend config.
 
+## Measuring what the game writes live (probe)
+
+`wowtracker-companion probe` watches the game's `Logs`, `WTF`, `Screenshots` and `Errors`
+folders while you play. It prints every file the game writes, and for the combat log how
+many seconds old the lines are when they reach the disk. It only reads files; it never
+touches the game.
+
+1. Start it:
+   ```bash
+   wowtracker-companion probe
+   ```
+2. In game, turn on advanced combat logging, then start logging:
+   ```
+   /console advancedCombatLogging 1
+   /combatlog
+   ```
+3. Play for 5–10 minutes. Walk, mount up, fight a few mobs, eat or drink, change zone,
+   and stand still for a bit.
+
+4. Try the developer log, the only known way an addon might write its own text to a file
+   while you play. With the probe still running, type these one at a time, then watch
+   for a new or growing file under `Logs`:
+   ```
+   /console developerLog 1
+   /console developerLogWriteToFile 1
+   /run C_Log.LogMessage("wt-probe "..date("%H:%M:%S"))
+   ```
+   Run the last line a few times, a few seconds apart.
+
+The probe prints a summary every minute. The numbers that matter are the combat log's
+"newest event … s old" values, which show how far behind the file is, and how many lines
+carry a position. `--show-lines` prints every line instead of the first of each type.
+Type `/combatlog` again to stop logging; the log files can get large. Leave combat
+logging on or off as it is during fights; switching it to force a write would be working
+around Blizzard's deliberate delay.
+
+The full list of things worth measuring is in
+[research/near-live-options.md](research/near-live-options.md#8-what-to-measure-in-game).
+
 ## Map images (optional)
 
 Without images the site draws a schematic map: zone names at their real positions, the

@@ -1,0 +1,119 @@
+# Design research: how live can the tracker be?
+
+Status: research done, in-game measurements pending (2026-11-05)
+
+## Problem
+
+The map only updates when the game saves the addon's data, which happens on `/reload`,
+`/wt sync`, logout or exit. In normal play that means the dot can be minutes or hours
+behind. The goal is updates every second or so, or at least every few minutes, without
+having to reload.
+
+## Constraint: zero Terms-of-Service risk
+
+Only routes that Blizzard provides, or that read files the game writes for players, are
+acceptable. These are excluded even though they would work:
+
+| Excluded route | Why |
+|---|---|
+| Pixel strip read off the screen (incl. screenshot tricks) | Grey area under the EULA's "reads or mines information" clause. Bots use the same technique. |
+| Reading game memory, sniffing network traffic | Clear EULA violations; what Warden detects. |
+| Overwolf | Not Blizzard-approved, unknown data source, one reported suspension. Its Forever feed has no x/y anyway. |
+| Toggling combat logging to force writes | Works around a delay Blizzard added on purpose. |
+
+## Why addons can't just send data
+
+- **No way out of the game.** Addons have no network access and cannot write files. Their
+  only disk output is SavedVariables, which the game writes on reload, logout or exit.
+- **No force-save.** There is no API to write SavedVariables while playing.
+- **The combat log is delayed on purpose.** Since Dragonflight season 3, Blizzard holds the
+  combat log back so outside tools can't use it in real time
+  ([Blizzard announcement](https://us.forums.blizzard.com/en/wow/t/nerfing-combat-logs-will-it-happen-should-it-happen/1654695?page=7),
+  [coverage](https://warcrafttavern.com/wow/news/blizzard-is-changing-how-the-advanced-combat-log-functions-in-dragonflight-for-season-3)).
+
+So **no known risk-free route reaches 1 second.** The realistic target is somewhere between
+one and a few minutes.
+
+## Options evaluated
+
+| # | Route | Latency | Data | Risk | Status |
+|---|---|---|---|---|---|
+| 0 | SavedVariables + file watcher (**current**) | At `/reload`, `/wt sync`, logout | Everything the addon collects | None | Built |
+| 1 | Battle.net API, protected character | Unknown: logout only, or periodic while online | Position (world x/y, zone, map), level | None (official API, your consent) | Needs testing |
+| 2 | Combat log tail (advanced logging on) | Minutes (one beta report: ~4 min after a fight) | Your position on every spell you cast, zone changes, enemy names, HP, levels | Very low (how Warcraft Logs works) | Probe built |
+| 3 | Developer log (`C_Log.LogMessage`) | Unknown | Whatever the addon writes | None if it works | Needs testing |
+| 4 | Chat log | Written at exit | — | Low | Rejected |
+| 5 | Config.wtf / other WTF files | Written at logout or reload | — | None | Rejected |
+| 6 | Battle.net friends presence | Live, but in-game only | Zone, level | None | Rejected: no export |
+| 7 | Discord guild bridge | Manual key press only | Free text | None | Rejected: not automatic |
+
+### 1. Battle.net API: protected character
+
+- **What it returns.** Blizzard's profile API returns `position` (zone, map, world x/y/z,
+  facing) for your own characters
+  ([example response](https://us.forums.blizzard.com/en/blizzard/t/wow-profile-api-character-position-zone-coordinates/13506)).
+- **What it needs.** A one-time Battle.net login granting the `wow.profile` scope, and a
+  free API client from develop.battle.net.
+- **Forever support.** A Forever namespace (`profile-forever-{region}`) was seen responding
+  on 2026-11-02; character routes were not working yet then.
+- **The open question is freshness.** If `position` updates while you are online, polling
+  it every minute gives a risk-free, reload-free map. If it only updates at logout, it is
+  no better than what we have.
+- **Fit with what's built.** World x/y can already be drawn: the website converts world
+  coordinates with the game's own map tables.
+
+### 2. Combat log tail
+
+- **What gets logged.** With advanced combat logging on, every spell you cast logs your
+  world position and map ID, even out of combat. That includes mounting, gathering and
+  eating. Zone and map changes are logged too.
+- **Gaps.** Walking without casting logs nothing. There is no XP or character level in
+  the log.
+- **Latency.** Minutes, by Blizzard's design. One Forever beta report saw about 4 minutes;
+  Warcraft Recorder allows up to 10 minutes of silence for retail and Forever logs.
+- **Bonus.** It records who you fought, by name, which the addon cannot see during
+  combat.
+- **Format.** Combat log version 22. The advanced block is 19 fields, and position is in
+  world yards. Inside dungeons the map ID is 0.
+
+### 3. Developer log
+
+- **The idea.** `C_Log.LogMessage` is available to addons in Forever with no
+  restrictions. With the `developerLog` setting on, it may write to a file under `Logs`.
+- **Why it matters.** If that file is written promptly, the addon could write its own
+  status line every few seconds. That would be the best risk-free channel.
+- **Status.** Completely untested.
+
+## Recommendation
+
+1. **Keep option 0** as the baseline. It is complete and reliable.
+2. **Measure before building.** Run `wowtracker-companion probe` during a normal session
+   (see [setup.md](../setup.md#measuring-what-the-game-writes-live-probe)). It answers
+   options 2 and 3:
+   - how old combat log lines are when they reach disk;
+   - how many lines carry your position;
+   - whether the developer log writes a file at all.
+3. **Test option 1**, using a small checker that logs in once and polls your position every
+   minute for 30 minutes while you move between zones.
+4. **Build in this order, depending on results:**
+   - If the API position updates while online, add it to the backend as the main live
+     source. The backend polls; nothing changes in game.
+   - If the developer log writes promptly, add it to the addon and companion.
+   - Otherwise, add the combat log tail to the companion. It gives the trail and fight
+     details within minutes. Also add an "updated N min ago" note on the map.
+
+## Measurements needed
+
+| What | How | Decides |
+|---|---|---|
+| Combat log delay | Probe: "newest event … s old" values | Whether option 2 is worth building |
+| Position coverage in the combat log | Probe: lines "with position" while walking, mounting, fighting | How smooth the trail would be |
+| Developer log | Probe + `/console developerLog 1`, `/console developerLogWriteToFile 1`, `/run C_Log.LogMessage("wt-probe "..date("%H:%M:%S"))` | Whether option 3 exists at all |
+| API position freshness | Checker polling every 60 s while you play | Whether option 1 beats option 0 |
+| Game folder and process name | Probe output, Task Manager | Companion defaults (`_forever_`, `Wow.exe` assumed) |
+
+## Sources
+
+- Full research with all sources: [research/near-live-options.md](../research/near-live-options.md)
+- Earlier research (addon API, secret values, map maths):
+  [research/wow-classic-live-tracker.md](../research/wow-classic-live-tracker.md)

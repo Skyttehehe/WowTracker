@@ -110,6 +110,8 @@ pub struct Args {
     pub once: bool,
     pub dry_run: bool,
     pub init: bool,
+    pub probe: bool,
+    pub show_lines: bool,
     pub help: bool,
     pub version: bool,
 }
@@ -120,6 +122,8 @@ wowtracker-companion: sends your WowTracker addon data to your backend
 USAGE:
     wowtracker-companion [OPTIONS]
     wowtracker-companion init        write an example config file
+    wowtracker-companion probe       show which game files are written while you play, and
+                                     how far behind the combat log is (--show-lines: every line)
 
 OPTIONS:
     --config <file>      config file (default: wowtracker-companion.toml here or next to the program)
@@ -142,6 +146,8 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Args, String
         let mut value = |name: &str| it.next().ok_or_else(|| format!("{name} needs a value"));
         match arg.as_str() {
             "init" => out.init = true,
+            "probe" => out.probe = true,
+            "--show-lines" => out.show_lines = true,
             "--config" => out.config = Some(PathBuf::from(value("--config")?)),
             "--wow-path" => out.wow_path = Some(PathBuf::from(value("--wow-path")?)),
             "--endpoint" => out.endpoint = Some(value("--endpoint")?),
