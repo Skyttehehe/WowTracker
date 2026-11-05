@@ -25,6 +25,11 @@ use wowtracker_protocol::{LivePosition, TrailPoint};
 
 /// Fields in the advanced block (combat log version 22).
 const ADVANCED_LEN: usize = 19;
+const HP: usize = 2;
+const HP_MAX: usize = 3;
+const POWER_TYPE: usize = 10;
+const POWER: usize = 11;
+const POWER_MAX: usize = 12;
 const POS_X: usize = 14;
 const POS_Y: usize = 15;
 const MAP_ID: usize = 16;
@@ -165,6 +170,11 @@ impl Parser {
             x: point.x,
             y: point.y,
             opponent,
+            hp: int(&f[start + HP]),
+            hp_max: int(&f[start + HP_MAX]),
+            power_type: int(&f[start + POWER_TYPE]),
+            power: int(&f[start + POWER]),
+            power_max: int(&f[start + POWER_MAX]),
             trail: Vec::new(),
         });
         Some(())
@@ -178,6 +188,10 @@ impl Parser {
         self.last_point = Some(TrailPoint { t: live.t, map_id: live.map_id, x: live.x, y: live.y });
         Some(live)
     }
+}
+
+fn int(s: &str) -> Option<i64> {
+    s.trim().parse().ok()
 }
 
 /// A breadcrumb every 5 s, or sooner after moving about 1% of the map.
@@ -340,6 +354,9 @@ mod tests {
         assert!((u.x - 0.605).abs() < 0.002 && (u.y - 0.738).abs() < 0.002, "{} {}", u.x, u.y);
         assert_eq!(u.opponent.as_deref(), Some("Webwood Venomfang"));
         assert_eq!(u.name.as_deref(), Some("Fractured-Archive-PvP-EU"));
+        // Health 93/174 and rage 76/1000 (rage is logged in tenths).
+        assert_eq!((u.hp, u.hp_max), (Some(93), Some(174)));
+        assert_eq!((u.power_type, u.power, u.power_max), (Some(1), Some(76), Some(1000)));
         assert!(p.take_update().is_none());
     }
 

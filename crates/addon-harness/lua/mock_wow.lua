@@ -11,7 +11,19 @@ Mock = {
   player = {
     name = "Testchar", realm = "Firemaw", level = 10, xp = 500, xpMax = 7000, rested = 1200,
     resting = false, className = "Warrior", classFile = "WARRIOR", race = "Human", faction = "Alliance",
+    hp = 150, hpMax = 200, powerType = 1, power = 300, powerMax = 1000, money = 1821, played = 7200,
   },
+  -- Quest log rows, classic style: headers and quests in order.
+  quests = {
+    { header = true, title = "Elwynn Forest" },
+    { title = "An Enticing Offer", level = 7, id = 101, objectives = {
+      { text = "Vial of Animal Blood: 4/6", numFulfilled = 4, numRequired = 6, finished = false },
+      { text = "0/18 Duskweed Petal", numFulfilled = 0, numRequired = 18, finished = false },
+    } },
+    { header = true, title = "Westfall" },
+    { title = "Continue to Stormwind", level = 10, id = 102, complete = 1, objectives = {} },
+  },
+  timePlayedRequests = 0,
   map = { id = 1429, x = 0.4123456, y = 0.6, zone = "Elwynn Forest", subzone = "Goldshire", instance = nil },
   target = nil,
 }
@@ -142,8 +154,33 @@ function UnitCreatureType() return hidden(T().creatureType) end
 function UnitReaction() return T().reaction end
 function UnitIsPlayer() return T().isPlayer and true or false end
 function UnitIsDead() return T().hp == 0 end
-function UnitHealth() return hidden(T().hp) end
-function UnitHealthMax() return hidden(T().hpMax) end
+function UnitHealth(unit)
+  if unit == "player" then return Mock.player.hp end
+  return hidden(T().hp)
+end
+function UnitHealthMax(unit)
+  if unit == "player" then return Mock.player.hpMax end
+  return hidden(T().hpMax)
+end
+function UnitPowerType() return Mock.player.powerType, "RAGE" end
+function UnitPower() return Mock.player.power end
+function UnitPowerMax() return Mock.player.powerMax end
+function GetMoney() return Mock.player.money end
+function GetTime() return Mock.clock end
+function RequestTimePlayed() Mock.timePlayedRequests = Mock.timePlayedRequests + 1 end
+
+function GetNumQuestLogEntries() return #Mock.quests, #Mock.quests end
+function GetQuestLogTitle(i)
+  local q = Mock.quests[i]
+  if not q then return nil end
+  return q.title, q.level, nil, q.header and true or false, false, q.complete, nil, q.id or 0
+end
+C_QuestLog = {
+  GetQuestObjectives = function(id)
+    for _, q in ipairs(Mock.quests) do if q.id == id then return q.objectives end end
+    return {}
+  end,
+}
 
 -- SavedVariables writer, imitating the client's format ------------------------
 

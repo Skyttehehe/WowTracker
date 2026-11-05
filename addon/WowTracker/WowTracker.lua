@@ -18,6 +18,10 @@ local POSITION_INTERVAL = 1   -- seconds between position reads
 local TRAIL_INTERVAL = 10     -- minimum seconds between trail points
 local TRAIL_MIN_MOVE = 0.003  -- minimum movement (fraction of the zone map) for a new trail point
 local TRAIL_MAX = 1500        -- trail points kept per character
+local JOURNAL_MAX = 1000      -- journal entries kept per character
+local XP_SAMPLE_MAX = 2000    -- levelling-curve samples kept per character
+local XP_SAMPLE_INTERVAL = 60 -- minimum played seconds between samples at the same level
+local QUEST_REFRESH = 1       -- minimum seconds between quest log reads
 
 local DEFAULT_SETTINGS = {
   endpoint = "",  -- backend ingest address, e.g. "192.168.0.117:1337" or "https://ingest.example.com"
@@ -80,6 +84,153 @@ local function addTrailPoint(mapID, x, y)
   while #trail > TRAIL_MAX do table.remove(trail, 1) end
 end
 
+-- Journal of levels, quests, zones, deaths and logins, newest last.
+local function journal(kind, entry)
+  entry = entry or {}
+  entry.t = now()
+  entry.kind = kind
+  local j = char.journal
+  j[#j + 1] = entry
+  while #j > JOURNAL_MAX do table.remove(j, 1) end
+end
+
+-- Played time in seconds. Counted while logged in, and corrected whenever the
+-- game reports the real total (TIME_PLAYED_MSG, e.g. after /played).
+local function onTimePlayed(total)
+  total = plain(total)
+  if not (char and type(total) == "number") then return end
+  if not char.playedSynced then
+    -- First real figure: shift what was counted before it.
+    local offset = total - (char.played or 0)
+    for _, s in ipairs(char.xpSamples) do s[1] = s[1] + offset end
+    char.playedSynced = true
+  end
+  char.played = total
+end
+
+-- Levelling curve and XP/hour: { played, level, xp, xpMax } samples.
+local function sampleXP(force)
+  if not (char and char.level and char.xpMax) then return end
+  local samples = char.xpSamples
+  local played = math.floor(char.played or 0)
+  local last = samples[#samples]
+  if last and not force then
+    if last[2] == char.level and (last[3] == char.xp or played - last[1] < XP_SAMPLE_INTERVAL) then return end
+  end
+  if last and last[1] == played then table.remove(samples) end
+  samples[#samples + 1] = { played, char.level, char.xp, char.xpMax }
+  while #samples > XP_SAMPLE_MAX do table.remove(samples, 1) end
+end
+
+-- Health and power, when the game does not hide them.
+local function updateVitals()
+  if not char then return end
+  char.hp, char.hpMax = plain(UnitHealth("player")), plain(UnitHealthMax("player"))
+  if UnitPower then
+    char.powerType = plain((UnitPowerType("player")))
+    char.power, char.powerMax = plain(UnitPower("player")), plain(UnitPowerMax("player"))
+  end
+end
+
+local function updateMoney()
+  if char and GetMoney then char.money = plain(GetMoney()) end
+end
+
+-- Quest log ----------------------------------------------------------------
+
+-- "Vial of Animal Blood: 4/6" or "4/6 Vial of Animal Blood" -> text, have, need.
+local function objective(text, have, need, done)
+  text = plain(text)
+  if type(text) ~= "string" or text == "" then return nil end
+  local name, a, b = text:match("^(.-):%s*(%d+)%s*/%s*(%d+)%s*$")
+  if not name then
+    a, b, name = text:match("^(%d+)%s*/%s*(%d+)%s+(.+)$")
+  end
+  if name then
+    text = name
+    have = plain(have) or tonumber(a)
+    need = plain(need) or tonumber(b)
+  end
+  return { text = text, have = plain(have), need = plain(need), done = plain(done) and true or false }
+end
+
+local function readObjectives(questID, index)
+  local out = {}
+  local list = questID and C_QuestLog and C_QuestLog.GetQuestObjectives and C_QuestLog.GetQuestObjectives(questID)
+  if type(list) == "table" then
+    for _, o in ipairs(list) do
+      out[#out + 1] = objective(o.text, o.numFulfilled, o.numRequired, o.finished)
+    end
+  elseif index and GetNumQuestLeaderBoards and GetQuestLogLeaderBoard then
+    for j = 1, GetNumQuestLeaderBoards(index) or 0 do
+      local text, _, finished = GetQuestLogLeaderBoard(j, index)
+      out[#out + 1] = objective(text, nil, nil, finished)
+    end
+  end
+  return out
+end
+
+-- One quest log row: title, level, isHeader, complete, failed, questID.
+local function questLogRow(i)
+  if GetQuestLogTitle then
+    local title, level, _, isHeader, _, complete, _, questID = GetQuestLogTitle(i)
+    return title, level, isHeader, complete == 1, complete == -1, questID
+  end
+  local info = C_QuestLog.GetInfo(i)
+  if not info or info.isHidden then return nil end
+  local done = info.questID and C_QuestLog.IsComplete and C_QuestLog.IsComplete(info.questID)
+  local failed = info.questID and C_QuestLog.IsFailed and C_QuestLog.IsFailed(info.questID)
+  return info.title, info.level, info.isHeader, done, failed, info.questID
+end
+
+local function readQuestLog()
+  if not char then return end
+  local count
+  if GetQuestLogTitle and GetNumQuestLogEntries then
+    count = GetNumQuestLogEntries()
+  elseif C_QuestLog and C_QuestLog.GetInfo and C_QuestLog.GetNumQuestLogEntries then
+    count = C_QuestLog.GetNumQuestLogEntries()
+  end
+  if type(count) ~= "number" then return end
+
+  local quests, header = {}, nil
+  for i = 1, count do
+    local title, level, isHeader, complete, failed, questID = questLogRow(i)
+    title = plain(title)
+    if title then
+      if isHeader then
+        header = title
+      else
+        quests[#quests + 1] = {
+          id = plain(questID),
+          title = title,
+          level = plain(level),
+          header = header,
+          complete = plain(complete) and true or false,
+          failed = plain(failed) and true or false,
+          objectives = readObjectives(plain(questID), i),
+        }
+      end
+    end
+  end
+  char.quests = quests
+  session.questsDirty = false
+  session.questsReadAt = GetTime and GetTime() or now()
+end
+
+local function questTitle(questID)
+  for _, q in ipairs(char.quests or {}) do
+    if q.id == questID then return q.title end
+  end
+  if C_QuestLog and C_QuestLog.GetTitleForQuestID then
+    local t = plain(C_QuestLog.GetTitleForQuestID(questID))
+    if t then return t end
+  end
+  if C_QuestLog and C_QuestLog.GetQuestInfo then
+    return plain(C_QuestLog.GetQuestInfo(questID))
+  end
+end
+
 local function updatePosition()
   if not char then return end
   char.zone = plain(GetRealZoneText())
@@ -125,6 +276,7 @@ local function updateXP()
   char.level, char.xp, char.xpMax = level, xp, xpMax
   char.rested = GetXPExhaustion() or 0
   char.resting = IsResting() and true or false
+  sampleXP()
 end
 
 -- Snapshot of a unit. In combat, Forever hides NPC name, type and health, so
@@ -208,11 +360,22 @@ local function initCharacter()
   char.xpGainedSession = 0
   char.inCombat = UnitAffectingCombat("player") and true or false
   char.trail = char.trail or {}
+  char.journal = char.journal or {}
+  char.xpSamples = char.xpSamples or {}
+  char.quests = char.quests or {}
+  char.deaths = char.deaths or 0
+  char.played = char.played or 0
 
   session = {}
   updateXP()
   updatePosition()
   updateTarget()
+  updateVitals()
+  updateMoney()
+  readQuestLog()
+  -- Learn the real played time once; afterwards it is counted here. (This
+  -- prints the usual "Total time played" lines in chat that one time.)
+  if not char.playedSynced and RequestTimePlayed then RequestTimePlayed() end
 end
 
 ---------------------------------------------------------------------------
@@ -230,6 +393,11 @@ local function onLogout()
   if char then
     updatePosition()
     updateXP()
+    updateVitals()
+    updateMoney()
+    if session.questsDirty then readQuestLog() end
+    char.played = math.floor(char.played or 0)
+    sampleXP(true)
     -- PLAYER_LOGOUT also fires on /reload; only a real logout means offline.
     char.status = reloading and "online" or "offline"
     char.savedAt = now()
@@ -340,6 +508,8 @@ local function printStatus()
     say((char.zone or "?") .. ": no map position here (instances hide it)")
   end
   say("trail points: " .. #char.trail .. ", in combat: " .. tostring(char.inCombat))
+  say(string.format("quests: %d, journal entries: %d, deaths: %d, played: %d min",
+    #char.quests, #char.journal, char.deaths or 0, math.floor((char.played or 0) / 60)))
   describeSettings()
 end
 
@@ -407,20 +577,64 @@ function handlers.PLAYER_LOGIN()
   initCharacter()
 end
 
-function handlers.PLAYER_ENTERING_WORLD()
+function handlers.PLAYER_ENTERING_WORLD(isInitialLogin)
   updatePosition()
+  updateXP()
+  if isInitialLogin then
+    journal("login", { zone = char.zone, level = char.level })
+    char.journalZone = char.zone
+  end
+end
+
+function handlers.ZONE_CHANGED_NEW_AREA()
+  updatePosition()
+  local zone = char.zone
+  if zone and zone ~= "" and zone ~= char.journalZone then
+    journal("zone", { zone = zone, level = char.level })
+    char.journalZone = zone
+  end
+end
+
+function handlers.PLAYER_LEVEL_UP(level)
+  journal("level", { level = plain(level), zone = char.zone })
   updateXP()
 end
 
-handlers.ZONE_CHANGED_NEW_AREA = updatePosition
+function handlers.PLAYER_DEAD()
+  char.deaths = (char.deaths or 0) + 1
+  journal("death", { level = char.level, zone = char.zone, subzone = char.subzone })
+end
+
+-- Classic passes (questLogIndex, questID); newer clients just (questID).
+function handlers.QUEST_ACCEPTED(a, b)
+  local questID = plain(b or a)
+  readQuestLog()
+  journal("questAccepted", { questID = questID, title = questTitle(questID) })
+end
+
+function handlers.QUEST_TURNED_IN(questID, xp, money)
+  questID = plain(questID)
+  -- The quest log still lists it until the next refresh.
+  journal("questDone", { questID = questID, title = questTitle(questID), xp = plain(xp), money = plain(money) })
+  session.questsDirty = true
+end
+
+local function questsChanged() session.questsDirty = true end
+handlers.QUEST_LOG_UPDATE = questsChanged
+handlers.UNIT_QUEST_LOG_CHANGED = questsChanged
+handlers.QUEST_REMOVED = questsChanged
+
+handlers.TIME_PLAYED_MSG = onTimePlayed
+handlers.PLAYER_MONEY = updateMoney
+handlers.UNIT_HEALTH = function(unit)
+  if unit == "player" then updateVitals() else updateTarget() end
+end
 handlers.ZONE_CHANGED = updatePosition
 handlers.ZONE_CHANGED_INDOORS = updatePosition
 handlers.PLAYER_XP_UPDATE = updateXP
-handlers.PLAYER_LEVEL_UP = updateXP
 handlers.UPDATE_EXHAUSTION = updateXP
 handlers.PLAYER_UPDATE_RESTING = updateXP
 handlers.PLAYER_TARGET_CHANGED = updateTarget
-handlers.UNIT_HEALTH = updateTarget
 handlers.PLAYER_REGEN_DISABLED = onCombatStart
 handlers.PLAYER_REGEN_ENABLED = onCombatEnd
 handlers.PLAYER_LOGOUT = onLogout
@@ -432,19 +646,27 @@ frame:SetScript("OnEvent", function(_, event, ...)
   end
 end)
 
+-- pcall: registering an event this client does not have raises an error.
 for event in pairs(handlers) do
   if event == "UNIT_HEALTH" then
-    frame:RegisterUnitEvent("UNIT_HEALTH", "target")
+    pcall(frame.RegisterUnitEvent, frame, "UNIT_HEALTH", "target", "player")
+  elseif event == "UNIT_QUEST_LOG_CHANGED" then
+    pcall(frame.RegisterUnitEvent, frame, event, "player")
   else
-    frame:RegisterEvent(event)
+    pcall(frame.RegisterEvent, frame, event)
   end
 end
 
 -- There is no "player moved" event, so poll the position.
 local elapsedSince = 0
 frame:SetScript("OnUpdate", function(_, elapsed)
+  if char then char.played = (char.played or 0) + elapsed end
   elapsedSince = elapsedSince + elapsed
   if elapsedSince < POSITION_INTERVAL then return end
   elapsedSince = 0
   updatePosition()
+  if session.questsDirty then
+    local t = GetTime and GetTime() or now()
+    if t - (session.questsReadAt or 0) >= QUEST_REFRESH then readQuestLog() end
+  end
 end)

@@ -52,8 +52,78 @@ pub struct Character {
 
     pub trail: Vec<TrailPoint>,
 
+    /// Copper.
+    pub money: Option<u64>,
+    pub deaths: Option<u32>,
+    /// Total played time in seconds, as of `saved_at`.
+    pub played: Option<f64>,
+    /// Health and power, when the game does not hide them from addons.
+    pub hp: Option<i64>,
+    pub hp_max: Option<i64>,
+    /// 0 mana, 1 rage, 3 energy (the game's power type index).
+    pub power_type: Option<i64>,
+    pub power: Option<i64>,
+    pub power_max: Option<i64>,
+    pub quests: Vec<Quest>,
+    /// Oldest first.
+    pub journal: Vec<JournalEntry>,
+    /// Levelling curve samples, oldest first.
+    pub xp_samples: Vec<XpSample>,
+
     /// Latest position read from the combat log. Set by the backend, not the addon.
     pub live: Option<LivePosition>,
+}
+
+/// One quest in the quest log.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Quest {
+    pub id: Option<u32>,
+    pub title: String,
+    pub level: Option<i32>,
+    /// Quest log section, usually the zone.
+    pub header: Option<String>,
+    pub complete: bool,
+    pub failed: bool,
+    pub objectives: Vec<Objective>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Objective {
+    pub text: String,
+    pub have: Option<i64>,
+    pub need: Option<i64>,
+    pub done: bool,
+}
+
+/// A journal event. `kind` is one of "login", "zone", "level", "death",
+/// "questAccepted", "questDone".
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct JournalEntry {
+    pub t: i64,
+    pub kind: String,
+    pub title: Option<String>,
+    #[serde(rename = "questID")]
+    pub quest_id: Option<u32>,
+    pub level: Option<u32>,
+    pub zone: Option<String>,
+    pub subzone: Option<String>,
+    /// Quest reward.
+    pub xp: Option<u64>,
+    /// Quest reward in copper.
+    pub money: Option<u64>,
+}
+
+/// The addon stores these as `{ played, level, xp, xpMax }` arrays.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct XpSample {
+    pub played: f64,
+    pub level: u32,
+    pub xp: u64,
+    pub xp_max: u64,
 }
 
 /// The player's position from the game's combat log (advanced logging on).
@@ -76,6 +146,12 @@ pub struct LivePosition {
     pub y: f64,
     /// Name of the creature in that line (never another player).
     pub opponent: Option<String>,
+    /// The player's health and power at that moment.
+    pub hp: Option<i64>,
+    pub hp_max: Option<i64>,
+    pub power_type: Option<i64>,
+    pub power: Option<i64>,
+    pub power_max: Option<i64>,
     /// Earlier positions since the previous update, oldest first. The backend
     /// moves these into the character's trail and stores this list empty.
     pub trail: Vec<TrailPoint>,

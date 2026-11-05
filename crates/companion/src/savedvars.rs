@@ -70,9 +70,20 @@ fn normalize_character(v: &mut Value) {
             fight.remove("target");
         }
     }
-    // A sparse trail (should not happen) parses as an object; drop it.
-    if map.get("trail").is_some_and(|t| !t.is_array()) {
-        map.remove("trail");
+    // A sparse list (should not happen) parses as an object; drop it.
+    for key in ["trail", "quests", "journal", "xpSamples"] {
+        if map.get(key).is_some_and(|t| !t.is_array()) {
+            map.remove(key);
+        }
+    }
+    if let Some(Value::Array(quests)) = map.get_mut("quests") {
+        for q in quests.iter_mut() {
+            if let Value::Object(q) = q {
+                if q.get("objectives").is_some_and(|o| !o.is_array()) {
+                    q.remove("objectives");
+                }
+            }
+        }
     }
 }
 

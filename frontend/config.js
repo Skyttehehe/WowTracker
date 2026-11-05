@@ -12,4 +12,10 @@ window.WOWTRACKER = {
   pollSeconds: 15,
 
   title: "WoW Tracker",
+
+  // Number, date and time format, e.g. "da-DK" (1.234, 18.31) or "en-GB".
+  locale: "da-DK",
+
+  // Level cap, for "N levels to go" and the level dots.
+  maxLevel: 60,
 };

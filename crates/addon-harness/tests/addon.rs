@@ -269,3 +269,75 @@ fn second_login_keeps_settings_and_trail() {
     assert!(second.characters[0].trail.len() >= points);
     assert_eq!(second.characters[0].xp_gained_session, Some(0), "session counter resets on login");
 }
+
+#[test]
+fn quests_journal_money_and_levelling_curve() {
+    let lua = load_addon();
+    run(&lua, LOGIN);
+    run(
+        &lua,
+        r#"
+        assert(Mock.timePlayedRequests == 1, "asks for /played once on first login")
+        Mock.fire("TIME_PLAYED_MSG", 7200, 600)
+
+        -- accept a quest
+        table.insert(Mock.quests, { title = "Murloc Gills", level = 12, id = 103, objectives = {
+          { text = "Longshore Murloc Gill: 0/7", numFulfilled = 0, numRequired = 7, finished = false } } })
+        Mock.fire("QUEST_ACCEPTED", 5, 103)
+
+        -- hand one in: XP, money, then it leaves the log
+        Mock.update(90)
+        Mock.player.xp = 1300; Mock.fire("PLAYER_XP_UPDATE", "player")
+        Mock.fire("QUEST_TURNED_IN", 102, 800, 350)
+        table.remove(Mock.quests, 4); table.remove(Mock.quests, 3)
+        Mock.fire("QUEST_LOG_UPDATE")
+        Mock.player.money = 2171; Mock.fire("PLAYER_MONEY")
+        Mock.update(2)
+
+        -- level up, travel, die
+        Mock.update(90)
+        Mock.player.level, Mock.player.xp, Mock.player.xpMax = 11, 100, 7500
+        Mock.fire("PLAYER_LEVEL_UP", 11); Mock.fire("PLAYER_XP_UPDATE", "player")
+        Mock.map.id, Mock.map.zone, Mock.map.subzone = 1436, "Westfall", "Sentinel Hill"
+        Mock.fire("ZONE_CHANGED_NEW_AREA")
+        Mock.fire("ZONE_CHANGED_NEW_AREA")   -- same zone again: no second entry
+        Mock.fire("PLAYER_DEAD")
+        Mock.fire("PLAYER_LOGOUT")
+        "#,
+    );
+    let (text, data) = saved(&lua);
+    let c = &data.characters[0];
+    assert_eq!(c.money, Some(2171));
+    assert_eq!(c.deaths, Some(1));
+    assert_eq!((c.hp, c.hp_max, c.power_type), (Some(150), Some(200), Some(1)));
+    assert!(c.played.unwrap() >= 7200.0 + 182.0, "played {:?}", c.played);
+
+    // Quest log, grouped by header, objectives split into text and counts.
+    let titles: Vec<&str> = c.quests.iter().map(|q| q.title.as_str()).collect();
+    assert_eq!(titles, ["An Enticing Offer", "Murloc Gills"], "{text}");
+    let q = &c.quests[0];
+    assert_eq!(q.header.as_deref(), Some("Elwynn Forest"));
+    assert_eq!(q.level, Some(7));
+    assert_eq!(q.objectives[0].text, "Vial of Animal Blood");
+    assert_eq!((q.objectives[0].have, q.objectives[0].need), (Some(4), Some(6)));
+    // Forever writes the count first.
+    assert_eq!(q.objectives[1].text, "Duskweed Petal");
+    assert_eq!((q.objectives[1].have, q.objectives[1].need), (Some(0), Some(18)));
+
+    let kinds: Vec<&str> = c.journal.iter().map(|e| e.kind.as_str()).collect();
+    assert_eq!(kinds, ["login", "questAccepted", "questDone", "level", "zone", "death"], "{text}");
+    assert_eq!(c.journal[1].title.as_deref(), Some("Murloc Gills"));
+    let done = &c.journal[2];
+    assert_eq!(done.title.as_deref(), Some("Continue to Stormwind"), "title read before it left the log");
+    assert_eq!((done.xp, done.money), (Some(800), Some(350)));
+    assert_eq!(c.journal[3].level, Some(11));
+    assert_eq!(c.journal[4].zone.as_deref(), Some("Westfall"));
+    assert_eq!(c.journal[5].subzone.as_deref(), Some("Sentinel Hill"));
+
+    // Levelling curve: samples in played-time order, ending at level 11.
+    assert!(c.xp_samples.len() >= 3, "{:?}", c.xp_samples);
+    assert!(c.xp_samples.windows(2).all(|w| w[0].played <= w[1].played));
+    assert!(c.xp_samples[0].played >= 7200.0, "shifted to the real played time");
+    let last = c.xp_samples.last().unwrap();
+    assert_eq!((last.level, last.xp), (11, 100));
+}
