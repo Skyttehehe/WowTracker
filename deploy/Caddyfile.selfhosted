@@ -1,0 +1,23 @@
+# Self-hosted: Caddy serves the website and proxies ONLY the read-only API.
+# The backend's ingest port (1337) is never mentioned here, so it is never public.
+#
+# Backend config on 192.168.0.117 for this setup:
+#   ingest_bind = "0.0.0.0:1337"      # LAN only; the companion sends here
+#   public_bind = "0.0.0.0:8080"      # Caddy reads from here (or 127.0.0.1:8080 if Caddy is on the same box)
+
+wowtracker.osrs.dk {
+	handle /api/* {
+		reverse_proxy 192.168.0.117:8080
+	}
+	handle {
+		root * /srv/wowtracker/frontend
+		file_server
+	}
+}
+
+# Alternative: let the backend serve the website too (frontend_dir in its config)
+# and proxy everything to the public listener:
+#
+# wowtracker.osrs.dk {
+# 	reverse_proxy 192.168.0.117:8080
+# }

@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: WoW Tracker
+## Notes: Saves your position, level, XP and combat state for the WowTracker companion app and website.
+## Author: Skyttehehe
+## Version: 0.1.0
+## SavedVariables: WowTrackerDB
+
+WowTracker.lua

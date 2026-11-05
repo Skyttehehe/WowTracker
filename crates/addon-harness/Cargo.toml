@@ -1,0 +1,11 @@
+[package]
+name = "addon-harness"
+description = "Runs the WowTracker addon in Lua 5.1 against a mocked WoW API, then reads its saved data with the companion"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+mlua = { version = "0.10", features = ["lua51", "vendored"] }
+wowtracker-companion = { path = "../companion" }
+wowtracker-protocol = { path = "../protocol" }

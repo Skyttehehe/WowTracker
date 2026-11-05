@@ -1,0 +1,837 @@
+{
+ "source": "wago.tools DB2 UiMap + UiMapAssignment, WoW: Forever build 1.60.1.70790",
+ "note": "min/max are world coordinates [x, y]. Type: 1 world, 2 continent, 3 zone, 6 battleground/instance.",
+ "maps": {
+  "947": {
+   "name": "Azeroth",
+   "parent": 0,
+   "type": 1
+  },
+  "1411": {
+   "name": "Durotar",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -1716.7,
+    -7250
+   ],
+   "max": [
+    1808.3,
+    -1962.5
+   ]
+  },
+  "1412": {
+   "name": "Mulgore",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -3835.4,
+    -3675
+   ],
+   "max": [
+    266.7,
+    2479.2
+   ]
+  },
+  "1413": {
+   "name": "The Barrens",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -5143.7,
+    -7510.4
+   ],
+   "max": [
+    1612.5,
+    2622.9
+   ]
+  },
+  "1414": {
+   "name": "Kalimdor",
+   "parent": 947,
+   "type": 2,
+   "instance": 1,
+   "min": [
+    -11733.3,
+    -19733.2
+   ],
+   "max": [
+    12799.9,
+    17066.6
+   ]
+  },
+  "1415": {
+   "name": "Eastern Kingdoms",
+   "parent": 947,
+   "type": 2,
+   "instance": 0,
+   "min": [
+    -16000,
+    -19199.9
+   ],
+   "max": [
+    7466.6,
+    16000
+   ]
+  },
+  "1416": {
+   "name": "Alterac Mountains",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -366.7,
+    -2016.7
+   ],
+   "max": [
+    1500,
+    783.3
+   ]
+  },
+  "1417": {
+   "name": "Arathi Highlands",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -2533.3,
+    -4466.7
+   ],
+   "max": [
+    -133.3,
+    -866.7
+   ]
+  },
+  "1418": {
+   "name": "Badlands",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -7547.9,
+    -4566.7
+   ],
+   "max": [
+    -5889.6,
+    -2079.2
+   ]
+  },
+  "1419": {
+   "name": "Blasted Lands",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -12800,
+    -4591.7
+   ],
+   "max": [
+    -10566.7,
+    -1241.7
+   ]
+  },
+  "1420": {
+   "name": "Tirisfal Glades",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    825,
+    -1485.4
+   ],
+   "max": [
+    3837.5,
+    3033.3
+   ]
+  },
+  "1421": {
+   "name": "Silverpine Forest",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -1133.3,
+    -750
+   ],
+   "max": [
+    1666.7,
+    3450
+   ]
+  },
+  "1422": {
+   "name": "Western Plaguelands",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    500,
+    -3883.3
+   ],
+   "max": [
+    3366.7,
+    416.7
+   ]
+  },
+  "1423": {
+   "name": "Eastern Plaguelands",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    825,
+    -6558.3
+   ],
+   "max": [
+    3691.7,
+    -2256.2
+   ]
+  },
+  "1424": {
+   "name": "Hillsbrad Foothills",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -1733.3,
+    -2133.3
+   ],
+   "max": [
+    400,
+    1066.7
+   ]
+  },
+  "1425": {
+   "name": "The Hinterlands",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -1100,
+    -5425
+   ],
+   "max": [
+    1466.7,
+    -1575
+   ]
+  },
+  "1426": {
+   "name": "Dun Morogh",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -7160.4,
+    -3122.9
+   ],
+   "max": [
+    -3877.1,
+    1802.1
+   ]
+  },
+  "1427": {
+   "name": "Searing Gorge",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -7587.5,
+    -2554.2
+   ],
+   "max": [
+    -6100,
+    -322.9
+   ]
+  },
+  "1428": {
+   "name": "Burning Steppes",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -8983.3,
+    -3195.8
+   ],
+   "max": [
+    -7031.2,
+    -266.7
+   ]
+  },
+  "1429": {
+   "name": "Elwynn Forest",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -10254.2,
+    -1935.4
+   ],
+   "max": [
+    -7939.6,
+    1535.4
+   ]
+  },
+  "1430": {
+   "name": "Deadwind Pass",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -11533.3,
+    -3333.3
+   ],
+   "max": [
+    -9866.7,
+    -833.3
+   ]
+  },
+  "1431": {
+   "name": "Duskwood",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -11516.7,
+    -1866.7
+   ],
+   "max": [
+    -9716.7,
+    833.3
+   ]
+  },
+  "1432": {
+   "name": "Loch Modan",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -6327.1,
+    -4752.1
+   ],
+   "max": [
+    -4487.5,
+    -1993.7
+   ]
+  },
+  "1433": {
+   "name": "Redridge Mountains",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -10022.9,
+    -3852.1
+   ],
+   "max": [
+    -8575,
+    -1681.2
+   ]
+  },
+  "1434": {
+   "name": "Stranglethorn Vale",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -15422.9,
+    -4160.4
+   ],
+   "max": [
+    -11168.7,
+    2220.8
+   ]
+  },
+  "1435": {
+   "name": "Swamp of Sorrows",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -11150,
+    -4516.7
+   ],
+   "max": [
+    -9620.8,
+    -2222.9
+   ]
+  },
+  "1436": {
+   "name": "Westfall",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -11733.3,
+    -483.3
+   ],
+   "max": [
+    -9400,
+    3016.7
+   ]
+  },
+  "1437": {
+   "name": "Wetlands",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -4904.2,
+    -4525
+   ],
+   "max": [
+    -2147.9,
+    -389.6
+   ]
+  },
+  "1438": {
+   "name": "Teldrassil",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    8437.5,
+    -1277.1
+   ],
+   "max": [
+    11831.3,
+    3814.6
+   ]
+  },
+  "1439": {
+   "name": "Darkshore",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    3966.7,
+    -3608.3
+   ],
+   "max": [
+    8333.3,
+    2941.7
+   ]
+  },
+  "1440": {
+   "name": "Ashenvale",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    829.2,
+    -4066.7
+   ],
+   "max": [
+    4672.9,
+    1700
+   ]
+  },
+  "1441": {
+   "name": "Thousand Needles",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -6900,
+    -4833.3
+   ],
+   "max": [
+    -3966.7,
+    -433.3
+   ]
+  },
+  "1442": {
+   "name": "Stonetalon Mountains",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -339.6,
+    -1637.5
+   ],
+   "max": [
+    2916.7,
+    3245.8
+   ]
+  },
+  "1443": {
+   "name": "Desolace",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -2545.8,
+    -262.5
+   ],
+   "max": [
+    452.1,
+    4233.3
+   ]
+  },
+  "1444": {
+   "name": "Feralas",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -7000,
+    -1508.3
+   ],
+   "max": [
+    -2366.7,
+    5441.7
+   ]
+  },
+  "1445": {
+   "name": "Dustwallow Marsh",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -5533.3,
+    -6225
+   ],
+   "max": [
+    -2033.3,
+    -975
+   ]
+  },
+  "1446": {
+   "name": "Tanaris",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -10475,
+    -7118.7
+   ],
+   "max": [
+    -5875,
+    -218.7
+   ]
+  },
+  "1447": {
+   "name": "Azshara",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    1960.4,
+    -8347.9
+   ],
+   "max": [
+    5341.7,
+    -3277.1
+   ]
+  },
+  "1448": {
+   "name": "Felwood",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    3300,
+    -4108.3
+   ],
+   "max": [
+    7133.3,
+    1641.7
+   ]
+  },
+  "1449": {
+   "name": "Un'Goro Crater",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -8433.3,
+    -3166.7
+   ],
+   "max": [
+    -5966.7,
+    533.3
+   ]
+  },
+  "1450": {
+   "name": "Moonglade",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    6952.1,
+    -3689.6
+   ],
+   "max": [
+    8491.7,
+    -1381.2
+   ]
+  },
+  "1451": {
+   "name": "Silithus",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -8281.2,
+    -945.8
+   ],
+   "max": [
+    -5958.3,
+    2537.5
+   ]
+  },
+  "1452": {
+   "name": "Winterspring",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    3800,
+    -7416.7
+   ],
+   "max": [
+    8533.3,
+    -316.7
+   ]
+  },
+  "1453": {
+   "name": "Stormwind City",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -9154.2,
+    -14.6
+   ],
+   "max": [
+    -7995.8,
+    1722.9
+   ]
+  },
+  "1454": {
+   "name": "Orgrimmar",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    1338.5,
+    -5083.2
+   ],
+   "max": [
+    2273.9,
+    -3680.6
+   ]
+  },
+  "1455": {
+   "name": "Ironforge",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -5096.8,
+    -1504.2
+   ],
+   "max": [
+    -4569.2,
+    -713.6
+   ]
+  },
+  "1456": {
+   "name": "Thunder Bluff",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -1545.8,
+    -527.1
+   ],
+   "max": [
+    -850,
+    516.7
+   ]
+  },
+  "1457": {
+   "name": "Darnassus",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    9532.6,
+    1880
+   ],
+   "max": [
+    10238.3,
+    2938.4
+   ]
+  },
+  "1458": {
+   "name": "Undercity",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    1237.8,
+    -86.2
+   ],
+   "max": [
+    1877.9,
+    873.2
+   ]
+  },
+  "1459": {
+   "name": "Alterac Valley",
+   "parent": 1424,
+   "type": 6,
+   "instance": 30,
+   "min": [
+    -1739.6,
+    -2456.2
+   ],
+   "max": [
+    1085.4,
+    1781.2
+   ]
+  },
+  "1460": {
+   "name": "Warsong Gulch",
+   "parent": 1413,
+   "type": 6,
+   "instance": 489,
+   "min": [
+    862.5,
+    895.8
+   ],
+   "max": [
+    1627.1,
+    2041.7
+   ]
+  },
+  "1461": {
+   "name": "Arathi Basin",
+   "parent": 1417,
+   "type": 6,
+   "instance": 529,
+   "min": [
+    337.5,
+    102.1
+   ],
+   "max": [
+    1508.3,
+    1858.3
+   ]
+  },
+  "1463": {
+   "name": "Eastern Kingdoms",
+   "parent": 0,
+   "type": 2,
+   "instance": 0,
+   "min": [
+    -15980,
+    -11880
+   ],
+   "max": [
+    5817,
+    9917
+   ]
+  },
+  "1464": {
+   "name": "Kalimdor",
+   "parent": 0,
+   "type": 2,
+   "instance": 1,
+   "min": [
+    -11870,
+    -13370
+   ],
+   "max": [
+    12470,
+    10970
+   ]
+  },
+  "2482": {
+   "name": "Mount Hyjal",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    3989.6,
+    -4395.8
+   ],
+   "max": [
+    6304.2,
+    -922.9
+   ]
+  },
+  "2521": {
+   "name": "Zephras Isle",
+   "parent": 947,
+   "type": 3,
+   "instance": 2991,
+   "min": [
+    1247.9,
+    -1331.2
+   ],
+   "max": [
+    4956.3,
+    4231.3
+   ]
+  },
+  "2524": {
+   "name": "Darkspear Islands",
+   "parent": 1414,
+   "type": 6,
+   "instance": 2997,
+   "min": [
+    -835.4,
+    993.8
+   ],
+   "max": [
+    447.9,
+    2918.8
+   ]
+  },
+  "2548": {
+   "name": "Riverglades",
+   "parent": 1415,
+   "type": 3,
+   "instance": 0,
+   "min": [
+    -9700,
+    -6741.7
+   ],
+   "max": [
+    -6466.7,
+    -1891.7
+   ]
+  },
+  "2652": {
+   "name": "Shen'dralas",
+   "parent": 1414,
+   "type": 3,
+   "instance": 1,
+   "min": [
+    -3266.7,
+    -25
+   ],
+   "max": [
+    -1900,
+    2025
+   ]
+  },
+  "2665": {
+   "name": "Zephras Isle",
+   "parent": 0,
+   "type": 3,
+   "instance": 2991,
+   "min": [
+    1247.9,
+    -1331.2
+   ],
+   "max": [
+    4956.3,
+    4231.3
+   ]
+  }
+ }
+}

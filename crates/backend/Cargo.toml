@@ -1,0 +1,14 @@
+[package]
+name = "wowtracker-backend"
+description = "WowTracker backend: private ingest listener for the companion, public read-only API for the website"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wowtracker-protocol = { path = "../protocol" }
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "fs", "sync", "signal"] }
+tower-http = { version = "0.6", features = ["cors", "fs"] }

@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = ["crates/protocol", "crates/companion", "crates/backend", "crates/addon-harness"]
+# `cargo build` builds the two apps; the addon test harness compiles Lua from C,
+# so it only builds when asked for (`cargo test -p addon-harness`).
+default-members = ["crates/protocol", "crates/companion", "crates/backend"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+[profile.release]
+strip = true
+lto = "thin"

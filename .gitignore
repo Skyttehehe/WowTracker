@@ -1,0 +1,8 @@
+target/
+*.json.tmp
+wowtracker-state.json
+wowtracker-backend.toml
+wowtracker-companion.toml
+frontend/maps/*
+!frontend/maps/README.md
+demo/

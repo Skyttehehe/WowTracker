@@ -1,0 +1,25 @@
+# systemd unit for the backend (e.g. in a Proxmox LXC container).
+#   sudo useradd --system --home /opt/wowtracker wowtracker
+#   sudo mkdir -p /opt/wowtracker && sudo cp wowtracker-backend /opt/wowtracker/
+#   cd /opt/wowtracker && sudo -u wowtracker ./wowtracker-backend init   # then edit wowtracker-backend.toml
+#   sudo cp wowtracker-backend.service /etc/systemd/system/
+#   sudo systemctl enable --now wowtracker-backend
+
+[Unit]
+Description=WowTracker backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=wowtracker
+WorkingDirectory=/opt/wowtracker
+ExecStart=/opt/wowtracker/wowtracker-backend --config /opt/wowtracker/wowtracker-backend.toml
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/wowtracker
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

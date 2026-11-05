@@ -1,0 +1,9 @@
+[package]
+name = "wowtracker-protocol"
+description = "Data types shared by the WowTracker companion and backend"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true

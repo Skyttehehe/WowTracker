@@ -1,0 +1,20 @@
+[package]
+name = "wowtracker-companion"
+description = "Watches the WowTracker addon's SavedVariables file and sends it to the WowTracker backend"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "wowtracker_companion"
+path = "src/lib.rs"
+
+[[bin]]
+name = "wowtracker-companion"
+path = "src/main.rs"
+
+[dependencies]
+wowtracker-protocol = { path = "../protocol" }
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+ureq = { version = "2", features = ["json"] }

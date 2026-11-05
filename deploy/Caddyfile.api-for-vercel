@@ -1,0 +1,16 @@
+# Website on Vercel, backend at home: Caddy exposes ONLY GET /api/* on its own
+# hostname, and frontend/vercel.json rewrites /api/* to it.
+#
+# In frontend/vercel.json:
+#   "destination": "https://wowtracker-api.osrs.dk/api/:path*"
+
+wowtracker-api.osrs.dk {
+	@read {
+		method GET HEAD
+		path /api/*
+	}
+	handle @read {
+		reverse_proxy 192.168.0.117:8080
+	}
+	respond 404
+}

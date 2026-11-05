@@ -1,0 +1,18 @@
+# systemd *user* unit for the companion on a Linux gaming PC.
+#   mkdir -p ~/.config/systemd/user ~/.local/share/wowtracker
+#   cp wowtracker-companion ~/.local/share/wowtracker/
+#   ~/.local/share/wowtracker/wowtracker-companion init --config ~/.local/share/wowtracker/wowtracker-companion.toml
+#   (edit wow_path in that file, it points into your Wine/Lutris prefix)
+#   cp wowtracker-companion.service ~/.config/systemd/user/
+#   systemctl --user enable --now wowtracker-companion
+
+[Unit]
+Description=WowTracker companion
+
+[Service]
+ExecStart=%h/.local/share/wowtracker/wowtracker-companion --config %h/.local/share/wowtracker/wowtracker-companion.toml
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
