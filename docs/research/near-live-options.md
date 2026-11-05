@@ -195,6 +195,7 @@ The log also carries every nearby player's position. Filter to your own GUID bef
   - It is an unrestricted public API. Its only restriction is that secret arguments are allowed only when untainted ([LogDocumentation.lua](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/LogDocumentation.lua)). Blizzard's own glue UI uses it for diagnostics ([Blizzard_CharacterCreate.lua](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_CharacterCreate/Mainline/Blizzard_CharacterCreate.lua)).
   - If enabling `developerLog` makes the client write those messages to a file under `Logs\` during play, an addon could write `mapID,x,y,level,xp` lines to disk every few seconds, with no pixels, no chat and no protected calls.
   - The ToS risk would be as low as reading the combat log: Blizzard's own logging, and a file the client writes. Everything here is **UNVERIFIED** until tested (section 8, test E).
+  - **Tested 2026-11-05: it does not work.** `DeveloperLog.log` stayed empty during play and after `/reload` ([live-tracking.md](../design/live-tracking.md#developer-log)).
   - It must never carry secret values, and the API rejects tainted secrets anyway.
 - **`taint.log`** can only be steered by deliberately tainting things. That is an abuse of a debugging feature. Not recommended.
 - **Force-saving SavedVariables.**

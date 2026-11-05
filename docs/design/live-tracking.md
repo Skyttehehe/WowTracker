@@ -41,7 +41,7 @@ one and a few minutes.
 | 0 | SavedVariables + file watcher (**current**) | At `/reload`, `/wt sync`, logout | Everything the addon collects | None | Built |
 | 1 | Battle.net API, protected character | Unknown: logout only, or periodic while online | Position (world x/y, zone, map), level | None (official API, your consent) | Needs testing |
 | 2 | Combat log tail (advanced logging on) | **Measured: 40–65 s in a busy zone** (written in ~32 KB batches); slower when quiet | Your position whenever you fight, zone changes with map bounds, enemy names, HP | Very low (how Warcraft Logs works) | Measured; best candidate |
-| 3 | Developer log (`C_Log.LogMessage`) | Unknown | Whatever the addon writes | None if it works | Needs testing |
+| 3 | Developer log (`C_Log.LogMessage`) | Never written (tested 2026-11-05) | — | None | Rejected |
 | 4 | Chat log | Written at exit | — | Low | Rejected |
 | 5 | Config.wtf / other WTF files | Written at logout or reload | — | None | Rejected |
 | 6 | Battle.net friends presence | Live, but in-game only | Zone, level | None | Rejected: no export |
@@ -82,7 +82,8 @@ one and a few minutes.
   restrictions. With the `developerLog` setting on, it may write to a file under `Logs`.
 - **Why it matters.** If that file is written promptly, the addon could write its own
   status line every few seconds. That would be the best risk-free channel.
-- **Status.** Completely untested.
+- **Status.** Tested 2026-11-05: nothing is written, during play or at `/reload`. See
+  [Measurements](#developer-log).
 
 ## Measurements (2026-11-05)
 
@@ -130,15 +131,23 @@ were written only at login and `/reload`, as expected.
 
 ### Developer log
 
-`Logs/DeveloperLog.log` stayed at 0 bytes for the whole session. If the `developerLog`
-commands and `C_Log.LogMessage` were run, this route does not write to a file in Forever.
-Unconfirmed whether they were run.
+Tested at about 18:40 with `/console developerLog 1`, `/console developerLogWriteToFile 1`
+and `/run C_Log.LogMessage("wt-probe "..date("%H:%M:%S"))`, run several times. The first
+attempt did nothing because `/run` waits for the game's "allow scripts?" prompt; after
+accepting it the script ran.
+
+- `Logs/DeveloperLog.log` stayed at 0 bytes, last changed when the game started.
+- No file under `Logs` contained `wt-probe`, checked every 2 seconds for 20 minutes.
+- A `/reload` at 18:40 wrote `Connection.log` (49 KB of `AccountData` lines marked
+  `isReloadingUI`), but still nothing from `C_Log.LogMessage`.
+
+**Result:** `C_Log.LogMessage` does not reach a file on Forever, so an addon cannot use it
+to get data out. Option 3 is rejected.
 
 ### Still to measure
 
 - Combat log delay in a quiet zone, alone, and while walking without fighting.
 - Whether `/reload` or logout writes out the remaining buffer.
-- The developer log, if it was not tested.
 
 ## Prior art: wow.skysoft.dk
 
@@ -217,7 +226,7 @@ excludes, so this site does not show a new risk-free route.
 |---|---|---|
 | Combat log delay | Probe: "newest event … s old" values | Whether option 2 is worth building |
 | Position coverage in the combat log | Probe: lines "with position" while walking, mounting, fighting | How smooth the trail would be |
-| Developer log | Probe + `/console developerLog 1`, `/console developerLogWriteToFile 1`, `/run C_Log.LogMessage("wt-probe "..date("%H:%M:%S"))` | Whether option 3 exists at all |
+| ~~Developer log~~ | Done 2026-11-05: writes nothing | Option 3 rejected |
 | API position freshness | Checker polling every 60 s while you play | Whether option 1 beats option 0 |
 | Game folder and process name | Probe output, Task Manager | Companion defaults (`_forever_`, `Wow.exe` assumed) |
 
